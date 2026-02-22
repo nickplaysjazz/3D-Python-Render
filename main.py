@@ -1,7 +1,7 @@
 import configparser
 import math
 import numpy as np
-import pygame as pg 
+import pygame as pg
 import sys
 
 from pathlib import Path
@@ -9,16 +9,17 @@ from pygame.locals import *
 from OpenGL.GL import *
 from OpenGL.GLU import *
 
+
 class RectangleObject:
     def __init__(
-            self, 
-            pos1, 
-            pos2,
-            body_color=(0.1,0.1,0.1),
-            edge_color=(1,1,1),
-            draw_body=True,
-            draw_edges=False
-        ):
+        self,
+        pos1,
+        pos2,
+        body_color=(0.1, 0.1, 0.1),
+        edge_color=(1, 1, 1),
+        draw_body=True,
+        draw_edges=False,
+    ):
         self.x1, self.y1, self.z1 = pos1
         self.x2, self.y2, self.z2 = pos2
 
@@ -28,15 +29,49 @@ class RectangleObject:
 
         self.body_color = body_color
         self.edge_color = edge_color
-        
-        unscaled_vertices = ((0,0,0),(1,0,0),(1,1,0),(0,1,0),(0,1,1),(1,1,1),(1,0,1),(0,0,1))
+
+        unscaled_vertices = (
+            (0, 0, 0),
+            (1, 0, 0),
+            (1, 1, 0),
+            (0, 1, 0),
+            (0, 1, 1),
+            (1, 1, 1),
+            (1, 0, 1),
+            (0, 0, 1),
+        )
         self.vertices = tuple(
-            tuple((val * s) + shift for val, s, shift in zip(vertex, (self.width, self.height, self.depth), pos1))
+            tuple(
+                (val * s) + shift
+                for val, s, shift in zip(
+                    vertex, (self.width, self.height, self.depth), pos1
+                )
+            )
             for vertex in unscaled_vertices
         )
-    
-        self.edges = ((0,1),(1,2),(2,3),(3,0),(4,5),(5,6),(6,7),(7,4),(3,4),(0,7),(1,6),(5,2))
-        self.quads = ((0,1,2,3),(4,5,6,7),(1,2,5,6),(0,3,4,7),(2,3,4,5),(0,1,6,7))
+
+        self.edges = (
+            (0, 1),
+            (1, 2),
+            (2, 3),
+            (3, 0),
+            (4, 5),
+            (5, 6),
+            (6, 7),
+            (7, 4),
+            (3, 4),
+            (0, 7),
+            (1, 6),
+            (5, 2),
+        )
+        self.quads = (
+            (0, 1, 2, 3),
+            (4, 5, 6, 7),
+            (1, 2, 5, 6),
+            (0, 3, 4, 7),
+            (2, 3, 4, 5),
+            (0, 1, 6, 7),
+        )
 
         self.draw_body = draw_body
         self.draw_edges = draw_edges
@@ -57,7 +92,7 @@ class RectangleObject:
                 for vertex in edge:
                     glVertex3fv(self.vertices[vertex])
             glEnd()
-            
+
 
 # floorVertices = ((1,1,1),(-1,1,-1),(1,1,-1),(-1,1,1))
 # floorQuads = ((0,2,1,3),)
@@ -110,27 +145,31 @@ class RectangleObject:
 #     else:
 #         return False
 
+
 def parse_ini():
     BASE_DIR = Path(__file__).resolve().parent
     config_path = BASE_DIR / "settings.ini"
     config = configparser.ConfigParser()
     config.read(config_path)
     return config
-            
+
+
 def main():
     RED_TEXT = "\033[31m"
     RESET_TEXT = "\033[0m"
     try:
         settings = parse_ini()
     except configparser.ParsingError as e:
-        print(f"{RED_TEXT}!! ERROR !! Configuration file does not follow legal syntax:\n{e}{RESET_TEXT}")
+        print(
+            f"{RED_TEXT}!! ERROR !! Configuration file does not follow legal syntax:\n{e}{RESET_TEXT}"
+        )
         sys.exit(1)
 
     try:
-        DISPLAY_WIDTH = settings.getint('Options', 'DISPLAY_WIDTH')
-        DISPLAY_HEIGHT = settings.getint('Options', 'DISPLAY_HEIGHT')
-        FOV = settings.getfloat('Options', 'FOV')
-        MOUSE_SENSITIVITY = settings.getfloat('Options','MOUSE_SENSITIVITY')
+        DISPLAY_WIDTH = settings.getint("Options", "DISPLAY_WIDTH")
+        DISPLAY_HEIGHT = settings.getint("Options", "DISPLAY_HEIGHT")
+        FOV = settings.getfloat("Options", "FOV")
+        MOUSE_SENSITIVITY = settings.getfloat("Options", "MOUSE_SENSITIVITY")
     except ValueError as e:
         print(f"{RED_TEXT}!! ERROR !! Type mismatch error:\n{e}{RESET_TEXT}")
         sys.exit(1)
@@ -141,15 +180,13 @@ def main():
     # Double buffering means we can transform one buffer while leaving the visible one untouched
     pg.display.set_mode(display, DOUBLEBUF | OPENGL)
     pg.mouse.set_visible(False)
-    pg.event.set_grab(True) # Lock mouse to window
+    pg.event.set_grab(True)  # Lock mouse to window
 
     # Define system geometry
-    level_geometry = [
-        RectangleObject((-5, -2, -5), (5, -1, 5))
-    ]
+    level_geometry = [RectangleObject((-5, -2, -5), (5, -1, 5))]
 
     # Defines camera "frustrum"
-    gluPerspective(FOV, (display[0]/display[1]), 0.1, 100.0)
+    gluPerspective(FOV, (display[0] / display[1]), 0.1, 100.0)
     glEnable(GL_DEPTH_TEST)
     # glEnable(GL_CULL_FACE)
 
@@ -171,7 +208,7 @@ def main():
                 pg.quit()
                 sys.exit()
             if event.type == pg.KEYDOWN:
-                if event.key == pg.K_ESCAPE: 
+                if event.key == pg.K_ESCAPE:
                     pg.quit()
                     sys.exit()
 
@@ -204,16 +241,16 @@ def main():
             dx += right_x * move_speed
             dz += right_z * move_speed
 
-        #if not is_wall(cam_x + dx, cam_z):
+        # if not is_wall(cam_x + dx, cam_z):
         cam_x += dx
 
-        #if not is_wall(cam_x, cam_z + dz):
+        # if not is_wall(cam_x, cam_z + dz):
         cam_z += dz
-                
-        # clear previous screen
-        glClear(GL_COLOR_BUFFER_BIT|GL_DEPTH_BUFFER_BIT)
 
-        # transformations and drawing 
+        # clear previous screen
+        glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
+
+        # transformations and drawing
         # ===============================================
         glPushMatrix()
 
@@ -227,22 +264,23 @@ def main():
             obj.draw()
 
         # Moving objects should be handled with individual matrices
-        #glPushMatrix()
-        #glRotatef(cube_rotation, 1, 1, 1)
-        #draw_wire_cube()
-        #glPopMatrix()
+        # glPushMatrix()
+        # glRotatef(cube_rotation, 1, 1, 1)
+        # draw_wire_cube()
+        # glPopMatrix()
 
         glPopMatrix()
         # ===============================================
 
         # Update any states here for e.g. animations
         cube_rotation += 1
-        
-        # display to user       
+
+        # display to user
         pg.display.flip()
 
         # wait at 60 fps
         clock.tick(60)
+
 
 if __name__ == "__main__":
     main()
