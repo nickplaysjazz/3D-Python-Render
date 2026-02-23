@@ -207,7 +207,7 @@ def main():
         objects=[
             RectangleObject((-15, -1.1, -15), (15, -1, 15), clipping=False),
             RectangleObject(
-                (-7, -1, 5),
+                (-7, -0.9, 5),
                 (-6, 1, 8),
                 body_color=(0, 0.2, 0),
                 draw_edges=True,
@@ -219,6 +219,7 @@ def main():
     # Defines camera "frustrum"
     gluPerspective(FOV, (display[0] / display[1]), 0.1, 100.0)
     glEnable(GL_DEPTH_TEST)
+    glEnable(GL_LINE_SMOOTH)
     # glEnable(GL_CULL_FACE)
 
     clock = pg.time.Clock()
