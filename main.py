@@ -10,6 +10,73 @@ from OpenGL.GL import *
 from OpenGL.GLU import *
 
 
+class Level:
+    def __init__(self, objects):
+        self.objects = objects
+        self.navmesh = self.update_navmesh()
+        self.navmesh_padding = 0.3
+
+    def update_navmesh(self):
+        xz_vertices = [
+            (obj.x1, obj.z1, obj.x2, obj.z2)
+            for obj in self.objects
+            if obj.clipping == True
+        ]
+        navmesh = self.union_of_rectangles(xz_vertices)
+        return navmesh
+
+    def is_in_navmesh(self, x, z):
+        for n in self.navmesh:
+            if (
+                (x > n[0] - self.navmesh_padding)
+                and (x < n[2] + self.navmesh_padding)
+                and (z > n[1] - self.navmesh_padding)
+                and (z < n[3] + self.navmesh_padding)
+            ):
+                return True
+        return False
+
+    def merge_intervals(self, intervals):
+        if not intervals:
+            return []
+        sorted_intervals = sorted(intervals, key=lambda x: x[0])
+        merged = []
+        curr_start, curr_end = sorted_intervals[0]
+        for nxt_start, nxt_end in sorted_intervals[1:]:
+            if nxt_start <= curr_end:
+                curr_end = max(curr_end, nxt_end)
+            else:
+                merged.append((curr_start, curr_end))
+                curr_start, curr_end = nxt_start, nxt_end
+        merged.append((curr_start, curr_end))
+        return merged
+
+    def union_of_rectangles(self, rects):
+        """
+        rects: List of (x1, z1, x2, z2)
+        Returns: List of disjoint (x1, z1, x2, z2) representing the union.
+        """
+        x_coords = sorted(list(set([r[0] for r in rects] + [r[2] for r in rects])))
+
+        disjoint_rects = []
+
+        for i in range(len(x_coords) - 1):
+            x_start = min(x_coords[i], x_coords[i + 1])
+            x_end = max(x_coords[i], x_coords[i + 1])
+
+            active_z_ranges = []
+            for x1, z1, x2, z2 in rects:
+                if min(x1, x2) <= x_start and max(x1, x2) >= x_end:
+                    active_z_ranges.append((z1, z2))
+
+            merged_z = self.merge_intervals(active_z_ranges)
+
+            for z_start, z_end in merged_z:
+                disjoint_rects.append((x_start, z_start, x_end, z_end))
+
+        return disjoint_rects
+
+
 class RectangleObject:
     def __init__(
         self,
@@ -19,6 +86,7 @@ class RectangleObject:
         edge_color=(1, 1, 1),
         draw_body=True,
         draw_edges=False,
+        clipping=True,
     ):
         self.x1, self.y1, self.z1 = pos1
         self.x2, self.y2, self.z2 = pos2
@@ -76,6 +144,8 @@ class RectangleObject:
         self.draw_body = draw_body
         self.draw_edges = draw_edges
 
+        self.clipping = clipping
+
     def draw(self):
         if self.draw_body:
             glBegin(GL_QUADS)
@@ -92,58 +162,6 @@ class RectangleObject:
                 for vertex in edge:
                     glVertex3fv(self.vertices[vertex])
             glEnd()
-
-
-# floorVertices = ((1,1,1),(-1,1,-1),(1,1,-1),(-1,1,1))
-# floorQuads = ((0,2,1,3),)
-
-# wallVertices = (
-#     (1,1,1),(1,1,-1),(-1,1,-1),(-1,1,1),
-#     (1,1,1),(1,1,-1),(-1,1,-1),(-1,1,1)
-# )
-# wallQuads = ((0,1,5,4),(1,2,6,5),(2,3,7,6),(3,0,4,7))
-
-# def draw_wire_cube():
-#     glBegin(GL_LINES)
-#     glColor3fv((1,1,1))
-#     for cubeEdge in cubeEdges:
-#         for cubeVertex in cubeEdge:
-#             glVertex3fv(cubeVertices[cubeVertex])
-#     glEnd()
-
-# def draw_solid_cube():
-#     glBegin(GL_QUADS)
-#     for i, cubeQuad in enumerate(cubeQuads):
-#         glColor3fv(colors[i])
-#         for cubeVertex in cubeQuad:
-#             glVertex3fv(cubeVertices[cubeVertex])
-#     glEnd()
-
-# def draw_floor():
-#     glBegin(GL_QUADS)
-#     glColor3fv((0.2,0.2,0.2))
-#     for floorQuad in floorQuads:
-#         for floorVertex in floorQuad:
-#             glVertex3fv(floorVertices[floorVertex])
-#     glEnd()
-
-# def draw_walls():
-#     glBegin(GL_QUADS)
-#     glColor3fv((0.1,0.1,0.1))
-#     for wallQuad in wallQuads:
-#         for wallVertex in wallQuad:
-#             glVertex3fv(wallVertices[wallVertex])
-#     glEnd()
-
-# def is_wall(x, z):
-#     padding = 0.3
-
-#     if x < -MAP_WIDTH/2 + padding or x > MAP_WIDTH/2 - padding:
-#         return True
-#     elif z < -MAP_HEIGHT/2 + padding or z > MAP_HEIGHT/2 - padding:
-#         return True
-#     else:
-#         return False
 
 
 def parse_ini():
@@ -170,11 +188,13 @@ def main():
         DISPLAY_HEIGHT = settings.getint("Options", "DISPLAY_HEIGHT")
         FOV = settings.getfloat("Options", "FOV")
         MOUSE_SENSITIVITY = settings.getfloat("Options", "MOUSE_SENSITIVITY")
+        FPS = settings.getint("Options", "FPS")
     except ValueError as e:
         print(f"{RED_TEXT}!! ERROR !! Type mismatch error:\n{e}{RESET_TEXT}")
         sys.exit(1)
 
     pg.init()
+
     display = (DISPLAY_WIDTH, DISPLAY_HEIGHT)
 
     # Double buffering means we can transform one buffer while leaving the visible one untouched
@@ -183,7 +203,18 @@ def main():
     pg.event.set_grab(True)  # Lock mouse to window
 
     # Define system geometry
-    level_geometry = [RectangleObject((-5, -2, -5), (5, -1, 5))]
+    levelMap = Level(
+        objects=[
+            RectangleObject((-15, -1.1, -15), (15, -1, 15), clipping=False),
+            RectangleObject(
+                (-7, -1, 5),
+                (-6, 1, 8),
+                body_color=(0, 0.2, 0),
+                draw_edges=True,
+                clipping=True,
+            ),
+        ]
+    )
 
     # Defines camera "frustrum"
     gluPerspective(FOV, (display[0] / display[1]), 0.1, 100.0)
@@ -194,7 +225,7 @@ def main():
 
     # Player Starting Position & Camera
     cam_x, cam_y, cam_z = 0, 0, 0
-    cube_rotation = 0
+    # cube_rotation = 0
     yaw, pitch = 0.0, 0.0
     move_speed = 0.1
     mouse_sensitivity = MOUSE_SENSITIVITY
@@ -241,11 +272,11 @@ def main():
             dx += right_x * move_speed
             dz += right_z * move_speed
 
-        # if not is_wall(cam_x + dx, cam_z):
-        cam_x += dx
+        if not levelMap.is_in_navmesh(cam_x + dx, cam_z):
+            cam_x += dx
 
-        # if not is_wall(cam_x, cam_z + dz):
-        cam_z += dz
+        if not levelMap.is_in_navmesh(cam_x, cam_z + dz):
+            cam_z += dz
 
         # clear previous screen
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
@@ -260,7 +291,7 @@ def main():
         glTranslatef(-cam_x, -cam_y, -cam_z)
 
         # Static objects
-        for obj in level_geometry:
+        for obj in levelMap.objects:
             obj.draw()
 
         # Moving objects should be handled with individual matrices
@@ -273,13 +304,13 @@ def main():
         # ===============================================
 
         # Update any states here for e.g. animations
-        cube_rotation += 1
+        # cube_rotation += 1
 
         # display to user
         pg.display.flip()
 
         # wait at 60 fps
-        clock.tick(60)
+        clock.tick(FPS)
 
 
 if __name__ == "__main__":
