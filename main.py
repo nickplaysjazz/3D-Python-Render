@@ -133,12 +133,12 @@ class RectangleObject:
             (5, 2),
         )
         self.quads = (
-            (0, 1, 2, 3),
+            (2, 3, 0, 1),
+            (5, 2, 1, 6),
             (4, 5, 6, 7),
-            (1, 2, 5, 6),
-            (0, 3, 4, 7),
-            (2, 3, 4, 5),
-            (0, 1, 6, 7),
+            (3, 4, 7, 0),
+            (3, 2, 5, 4),
+            (7, 6, 1, 0),
         )
 
         self.draw_body = draw_body
@@ -147,6 +147,14 @@ class RectangleObject:
         self.clipping = clipping
 
     def draw(self):
+        if self.draw_edges:
+            glBegin(GL_LINES)
+            glColor3fv(self.edge_color)
+            for edge in self.edges:
+                for vertex in edge:
+                    glVertex3fv(self.vertices[vertex])
+            glEnd()
+
         if self.draw_body:
             glBegin(GL_QUADS)
             glColor3fv(self.body_color)
@@ -155,13 +163,36 @@ class RectangleObject:
                     glVertex3fv(self.vertices[v])
             glEnd()
 
-        if self.draw_edges:
-            glBegin(GL_LINES)
-            glColor3fv(self.edge_color)
-            for edge in self.edges:
-                for vertex in edge:
-                    glVertex3fv(self.vertices[vertex])
-            glEnd()
+
+class OBJModel:
+    def __init__(self, filename):
+        self.vertices = []
+        self.faces = []
+
+        with open(filename, "r") as f:
+            for line in f:
+                # lines with v are vertices
+                if line.startswith("v "):
+                    parts = line.split()
+                    v = (float(parts[1]), float(parts[2]), float(parts[3]))
+                    self.vertices.append(v)
+
+                # lines with f are faces
+                elif line.startswith("f "):
+                    parts = line.split()
+                    face = []
+                    for part in parts[1:]:
+                        indices = part.split("/")
+                        # OBJ indices are 1-based, Python is 0-based, so subtract 1
+                        face.append(int(indices[0]) - 1)
+                    self.faces.append(face)
+
+    def draw(self):
+        glBegin(GL_TRIANGLES)
+        for face in self.faces:
+            for vertex_index in face:
+                glVertex3fv(self.vertices[vertex_index])
+        glEnd()
 
 
 def parse_ini():
@@ -219,8 +250,9 @@ def main():
     # Defines camera "frustrum"
     gluPerspective(FOV, (display[0] / display[1]), 0.1, 100.0)
     glEnable(GL_DEPTH_TEST)
-    glEnable(GL_LINE_SMOOTH)
+    glDepthFunc(GL_LESS)
     # glEnable(GL_CULL_FACE)
+    glEnable(GL_LINE_SMOOTH)
 
     clock = pg.time.Clock()
 
@@ -232,6 +264,8 @@ def main():
     mouse_sensitivity = MOUSE_SENSITIVITY
 
     glTranslatef(cam_x, cam_y, cam_z)
+
+    cyl = OBJModel("assets\cylinder.obj")
 
     while True:
         # handle events
@@ -290,6 +324,12 @@ def main():
         glRotatef(pitch, 1, 0, 0)
         glRotatef(yaw, 0, 1, 0)
         glTranslatef(-cam_x, -cam_y, -cam_z)
+
+        glPushMatrix()
+        glTranslatef(5, 1, 5)
+        glColor3f(0.1, 0.5, 0.1)
+        cyl.draw()
+        glPopMatrix()
 
         # Static objects
         for obj in levelMap.objects:
