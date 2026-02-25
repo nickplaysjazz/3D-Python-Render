@@ -262,7 +262,7 @@ def main():
                 clipping=True,
             ),
             Object(
-                pos=(-5, -1, 5),
+                pos=(-5, 2, 5),
                 body_color=(0, 0, 0.5),
                 filename="torus.obj",
                 clipping=True,
