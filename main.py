@@ -18,7 +18,7 @@ class Level:
 
     def update_navmesh(self):
         xz_vertices = [
-            (obj.x1, obj.z1, obj.x2, obj.z2)
+            (obj.x1, obj.z1, obj.x1 + obj.width, obj.z1 + obj.depth)
             for obj in self.objects
             if obj.clipping == True
         ]
@@ -77,95 +77,41 @@ class Level:
         return disjoint_rects
 
 
-class RectangleObject:
+class Object:
     def __init__(
         self,
-        pos1,
-        pos2,
+        pos,
+        filename,
         body_color=(0.1, 0.1, 0.1),
-        edge_color=(1, 1, 1),
-        draw_body=True,
-        draw_edges=False,
         clipping=True,
     ):
-        self.x1, self.y1, self.z1 = pos1
-        self.x2, self.y2, self.z2 = pos2
-
-        self.width = self.x2 - self.x1
-        self.height = self.y2 - self.y1
-        self.depth = self.z2 - self.z1
+        self.x1, self.y1, self.z1 = pos
+        self.filename = filename
+        self.width = None
+        self.depth = None
 
         self.body_color = body_color
-        self.edge_color = edge_color
-
-        unscaled_vertices = (
-            (0, 0, 0),
-            (1, 0, 0),
-            (1, 1, 0),
-            (0, 1, 0),
-            (0, 1, 1),
-            (1, 1, 1),
-            (1, 0, 1),
-            (0, 0, 1),
-        )
-        self.vertices = tuple(
-            tuple(
-                (val * s) + shift
-                for val, s, shift in zip(
-                    vertex, (self.width, self.height, self.depth), pos1
-                )
-            )
-            for vertex in unscaled_vertices
-        )
-
-        self.edges = (
-            (0, 1),
-            (1, 2),
-            (2, 3),
-            (3, 0),
-            (4, 5),
-            (5, 6),
-            (6, 7),
-            (7, 4),
-            (3, 4),
-            (0, 7),
-            (1, 6),
-            (5, 2),
-        )
-        self.quads = (
-            (2, 3, 0, 1),
-            (5, 2, 1, 6),
-            (4, 5, 6, 7),
-            (3, 4, 7, 0),
-            (3, 2, 5, 4),
-            (7, 6, 1, 0),
-        )
-
-        self.draw_body = draw_body
-        self.draw_edges = draw_edges
-
         self.clipping = clipping
 
+        self.load_obj(filename)
+
     def draw(self):
-        if self.draw_edges:
-            glBegin(GL_LINES)
-            glColor3fv(self.edge_color)
-            for edge in self.edges:
-                for vertex in edge:
-                    glVertex3fv(self.vertices[vertex])
-            glEnd()
+        glPushMatrix()
+        glTranslatef(self.x1, self.y1, self.z1)
 
-        if self.draw_body:
-            glBegin(GL_QUADS)
-            glColor3fv(self.body_color)
-            for q in self.quads:
-                for v in q:
-                    glVertex3fv(self.vertices[v])
-            glEnd()
+        glBegin(GL_TRIANGLES)
+        glColor3fv(self.body_color)
+        for q in self.faces:
+            for v in q:
+                glVertex3fv(self.vertices[v])
+        glEnd()
 
+        glPopMatrix()
 
-class OBJModel:
-    def __init__(self, filename):
+    def load_obj(self, filename):
+        BASE_DIR = Path(__file__).resolve().parent
+        assets_path = BASE_DIR / "assets"
+        filename = assets_path / filename
         self.vertices = []
         self.faces = []
 
@@ -187,12 +133,73 @@ class OBJModel:
                         face.append(int(indices[0]) - 1)
                     self.faces.append(face)
 
+        # Shift min vertex to 0,0,0 for easy translating later
+        mins = np.array(self.vertices).min(axis=0)
+        self.vertices -= mins
+
+        self.width = max([v[0] for v in self.vertices]) - min(
+            [v[0] for v in self.vertices]
+        )
+        self.depth = max([v[2] for v in self.vertices]) - min(
+            [v[2] for v in self.vertices]
+        )
+
+
+class RectangleObject(Object):
+    def __init__(
+        self,
+        pos,
+        size,
+        body_color=(0.1, 0.1, 0.1),
+        clipping=True,
+    ):
+        self.x1, self.y1, self.z1 = pos
+        self.width, self.height, self.depth = size
+
+        self.x2, self.y2, self.z2 = [s + p for s, p in zip(size, pos)]
+
+        self.body_color = body_color
+
+        unscaled_vertices = (
+            (0, 0, 0),
+            (1, 0, 0),
+            (1, 1, 0),
+            (0, 1, 0),
+            (0, 1, 1),
+            (1, 1, 1),
+            (1, 0, 1),
+            (0, 0, 1),
+        )
+        self.vertices = tuple(
+            tuple(
+                (val * s)
+                for val, s in zip(vertex, (self.width, self.height, self.depth))
+            )
+            for vertex in unscaled_vertices
+        )
+        self.quads = (
+            (2, 3, 0, 1),
+            (5, 2, 1, 6),
+            (4, 5, 6, 7),
+            (3, 4, 7, 0),
+            (3, 2, 5, 4),
+            (7, 6, 1, 0),
+        )
+
+        self.clipping = clipping
+
     def draw(self):
-        glBegin(GL_TRIANGLES)
-        for face in self.faces:
-            for vertex_index in face:
-                glVertex3fv(self.vertices[vertex_index])
+        glPushMatrix()
+        glTranslatef(self.x1, self.y1, self.z1)
+
+        glBegin(GL_QUADS)
+        glColor3fv(self.body_color)
+        for q in self.quads:
+            for v in q:
+                glVertex3fv(self.vertices[v])
         glEnd()
+
+        glPopMatrix()
 
 
 def parse_ini():
@@ -236,12 +243,22 @@ def main():
     # Define system geometry
     levelMap = Level(
         objects=[
-            RectangleObject((-15, -1.1, -15), (15, -1, 15), clipping=False),
             RectangleObject(
-                (-7, -0.9, 5),
-                (-6, 1, 8),
+                pos=(-15, -1.1, -15),
+                size=(30, 0.1, 30),
+                body_color=(0.1, 0.1, 0.1),
+                clipping=False,
+            ),
+            RectangleObject(
+                pos=(-10, -1, -10),
+                size=(5, 5, 5),
                 body_color=(0, 0.2, 0),
-                draw_edges=True,
+                clipping=True,
+            ),
+            Object(
+                pos=(5, -1, 5),
+                body_color=(0.5, 0, 0),
+                filename="cylinder.obj",
                 clipping=True,
             ),
         ]
@@ -251,7 +268,7 @@ def main():
     gluPerspective(FOV, (display[0] / display[1]), 0.1, 100.0)
     glEnable(GL_DEPTH_TEST)
     glDepthFunc(GL_LESS)
-    # glEnable(GL_CULL_FACE)
+    glEnable(GL_CULL_FACE)
     glEnable(GL_LINE_SMOOTH)
 
     clock = pg.time.Clock()
@@ -264,8 +281,6 @@ def main():
     mouse_sensitivity = MOUSE_SENSITIVITY
 
     glTranslatef(cam_x, cam_y, cam_z)
-
-    cyl = OBJModel("assets\cylinder.obj")
 
     while True:
         # handle events
@@ -324,12 +339,6 @@ def main():
         glRotatef(pitch, 1, 0, 0)
         glRotatef(yaw, 0, 1, 0)
         glTranslatef(-cam_x, -cam_y, -cam_z)
-
-        glPushMatrix()
-        glTranslatef(5, 1, 5)
-        glColor3f(0.1, 0.5, 0.1)
-        cyl.draw()
-        glPopMatrix()
 
         # Static objects
         for obj in levelMap.objects:
