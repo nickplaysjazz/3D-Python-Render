@@ -16,6 +16,8 @@ class Level:
         self.navmesh = self.update_navmesh()
         self.navmesh_padding = 0.3
 
+        self.light_color = [1.0, 1.0, 1.0]
+
     def update_navmesh(self):
         xz_vertices = [
             (obj.x1, obj.z1, obj.x1 + obj.width, obj.z1 + obj.depth)
@@ -262,7 +264,7 @@ def main():
                 clipping=True,
             ),
             Object(
-                pos=(-5, 2, 5),
+                pos=(-5, -0.6, 5),
                 body_color=(0, 0, 0.5),
                 filename="torus.obj",
                 clipping=True,
