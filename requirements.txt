@@ -1,0 +1,16 @@
+black @ file:///C:/Users/task_177063620090417/croot/black_1770636320661/work
+click @ file:///C:/miniconda3/conda-bld/click_1764332372183/work
+colorama @ file:///C:/Users/dev-admin/perseverance-python-buildout/croot/colorama_1729036581634/work
+configparser @ file:///C:/b/abs_7bnqemcgj8/croot/configparser_1754046046050/work
+mkl-service==2.5.2
+mkl_fft @ file:///C:/miniconda3/conda-bld/mkl_fft_1761592916781/work
+mkl_random @ file:///C:/miniconda3/conda-bld/mkl_random_1761593076691/work
+mypy_extensions @ file:///C:/Users/dev-admin/perseverance-python-buildout/croot/mypy_extensions_1729049023435/work
+numpy @ file:///C:/Users/task_177073258984462/croot/numpy_and_numpy_base_1770732696956/work/dist/numpy-2.4.2-cp313-cp313-win_amd64.whl#sha256=491b01c40ce79507d1ce28ef4a5a1c3be983bf99bcb6110fc54504650f578436
+packaging @ file:///C:/miniconda3/conda-bld/packaging_1761049099114/work
+pathlib @ file:///Users/ktietz/demo/mc3/conda-bld/pathlib_1629713961906/work
+pathspec @ file:///C:/Users/task_177039499504424/croot/pathspec_1770395550050/work
+platformdirs @ file:///C:/miniconda3/conda-bld/platformdirs_1762356623609/work
+pygame @ file:///D:/bld/pygame_1727636546961/work
+PyOpenGL @ file:///D:/bld/pyopengl_1756496259358/work
+pytokens @ file:///C:/miniconda3/conda-bld/pytokens_1764151940697/work
