@@ -4,11 +4,13 @@ import sys
 
 from OpenGL.GL import *
 from OpenGL.GLU import *
+from pathlib import Path
 from pygame.locals import *
 from pyglm import glm
 
 from camera import Camera
 from constants import Directions
+from error_handling import raise_error
 from setting_utils import read_settings
 from shader_utils import Shader
 
@@ -55,13 +57,21 @@ def main():
 
     # Pygame initialization
     pg.init()
-    # Required for MacOS compatability
-    pg.display.gl_set_attribute(pg.GL_CONTEXT_MAJOR_VERSION, 3)
-    pg.display.gl_set_attribute(pg.GL_CONTEXT_MINOR_VERSION, 3)
-    pg.display.gl_set_attribute(pg.GL_CONTEXT_PROFILE_MASK, pg.GL_CONTEXT_PROFILE_CORE)
-    pg.display.gl_set_attribute(
-        pg.GL_CONTEXT_FLAGS, pg.GL_CONTEXT_FORWARD_COMPATIBLE_FLAG
-    )
+    # Request OpenGL 3.3 context, fixes opengl error on Mac
+    try:
+        pg.display.gl_set_attribute(pg.GL_CONTEXT_MAJOR_VERSION, 3)
+        pg.display.gl_set_attribute(pg.GL_CONTEXT_MINOR_VERSION, 3)
+        pg.display.gl_set_attribute(
+            pg.GL_CONTEXT_PROFILE_MASK, pg.GL_CONTEXT_PROFILE_CORE
+        )
+        # Might not need forward compatability, but it seems to work
+        pg.display.gl_set_attribute(
+            pg.GL_CONTEXT_FLAGS, pg.GL_CONTEXT_FORWARD_COMPATIBLE_FLAG
+        )
+    except Exception as e:
+        raise_error(
+            Path(__file__).name, "Failed to initialize OpenGL context with PyGame", e
+        )
 
     pg.display.set_mode(display, DOUBLEBUF | OPENGL)
     pg.mouse.set_visible(False)
