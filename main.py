@@ -123,12 +123,13 @@ def main():
     camera = Camera(
         yaw=-90.0,
         pitch=0.0,
-        speed=0.02,
+        speed=0.01,
         sensitivity=settings["MOUSE_SENSITIVITY"],
         fov=settings["FOV"],
         pos=glm.vec3(0.0, 0.0, 3.0),
         up=glm.vec3(0, 1, 0),
         front=glm.vec3(0, 0, -1),
+        world_up=glm.vec3(0, 1, 0),
     )
 
     # We will need to keep track of ticks
@@ -162,7 +163,7 @@ def main():
             camera.process_keyboard(Directions.RIGHT, delta_ticks)
 
         mouse_dx, mouse_dy = pg.mouse.get_rel()
-        camera.process_mouse_movement(mouse_dx, mouse_dy, constrain_pitch=True)
+        camera.process_mouse_movement(mouse_dx, -mouse_dy, constrain_pitch=True)
 
         # clear previous screen
         glClearColor(0.2, 0.3, 0.3, 1)
