@@ -1,9 +1,7 @@
 import ctypes
-import math
 import pygame as pg
 import sys
 
-from enum import Enum
 from OpenGL.GL import *
 from OpenGL.GLU import *
 from pygame.locals import *
@@ -32,18 +30,18 @@ class newObject:
 
         self.indices = glm.array(
             glm.uint32,
-            2,0,3, 
-            0,2,1, 
-            5,1,2, 
-            1,5,6, 
-            4,6,5, 
-            6,4,7, 
-            3,7,4, 
-            7,3,0, 
-            3,5,2, 
-            5,3,4, 
-            7,1,6, 
-            1,7,0, 
+            2, 0, 3, 
+            0, 2, 1, 
+            5, 1, 2, 
+            1, 5, 6, 
+            4, 6, 5, 
+            6, 4, 7, 
+            3, 7, 4, 
+            7, 3, 0, 
+            3, 5, 2, 
+            5, 3, 4, 
+            7, 1, 6, 
+            1, 7, 0, 
         )       
         # fmt: on
 
@@ -57,6 +55,14 @@ def main():
 
     # Pygame initialization
     pg.init()
+    # Required for MacOS compatability
+    pg.display.gl_set_attribute(pg.GL_CONTEXT_MAJOR_VERSION, 3)
+    pg.display.gl_set_attribute(pg.GL_CONTEXT_MINOR_VERSION, 3)
+    pg.display.gl_set_attribute(pg.GL_CONTEXT_PROFILE_MASK, pg.GL_CONTEXT_PROFILE_CORE)
+    pg.display.gl_set_attribute(
+        pg.GL_CONTEXT_FLAGS, pg.GL_CONTEXT_FORWARD_COMPATIBLE_FLAG
+    )
+
     pg.display.set_mode(display, DOUBLEBUF | OPENGL)
     pg.mouse.set_visible(False)
     pg.event.set_grab(True)  # Lock mouse to window
@@ -98,10 +104,10 @@ def main():
         GL_ELEMENT_ARRAY_BUFFER, my_indices.nbytes, my_indices.ptr, GL_STATIC_DRAW
     )
 
-    # position attribute
+    # position attribute: x, y, z
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
     glEnableVertexAttribArray(0)
-    # color attribute
+    # color attribute: r, g, b
     glVertexAttribPointer(
         1,
         3,
@@ -114,9 +120,10 @@ def main():
 
     ourShader = Shader("vertex_shader.vert", "fragment_shader.frag")
 
-    # Defines camera "frustrum"
+    # Enable depth testing for drawing objects in correct order
     glEnable(GL_DEPTH_TEST)
     glDepthFunc(GL_LESS)
+    # Also do not render backfaces to save render time
     glEnable(GL_CULL_FACE)
 
     # Player starting position and camera variables
@@ -173,6 +180,7 @@ def main():
         # ===============================================
         ourShader.use()
 
+        # We could've defined this outside the game loop since it stays static
         projection = glm.perspective(
             glm.radians(settings["FOV"]), (display[0] / display[1]), 0.1, 100.0
         )
@@ -181,7 +189,6 @@ def main():
         view = camera.get_view_matrix()
         ourShader.setMat4("view", glm.value_ptr(view))
 
-        glBindVertexArray(vao_ID)
         for i in range(len(cubePositions)):
             model = glm.mat4(1.0)
             model = glm.translate(model, cubePositions[i])
@@ -198,7 +205,7 @@ def main():
         clock.tick(settings["FPS"])
 
         # Actual FPS
-        # clock.get_fps()
+        # print(clock.get_fps())
 
 
 if __name__ == "__main__":
