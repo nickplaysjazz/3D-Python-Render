@@ -96,12 +96,16 @@ def main():
         glm.vec3(-1.3, 1.0, -1.5),
     )
 
-    # Initialization code, should be done only once
+    # Some OpenGL initialization
+    # 1. Generate OpenGL components
     vao_ID = glGenVertexArrays(1)
     vbo_ID = glGenBuffers(1)
     ebo_ID = glGenBuffers(1)
 
+    # 2. Start recording into a VAO by binding it
     glBindVertexArray(vao_ID)
+
+    # 3. Bind VBO, which stores vertices
     glBindBuffer(GL_ARRAY_BUFFER, vbo_ID)
     glBufferData(
         GL_ARRAY_BUFFER,
@@ -109,11 +113,14 @@ def main():
         my_vertices.ptr,
         GL_STATIC_DRAW,
     )
+
+    # 4. Bind EBO, which stores indices to create faces
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_ID)
     glBufferData(
         GL_ELEMENT_ARRAY_BUFFER, my_indices.nbytes, my_indices.ptr, GL_STATIC_DRAW
     )
 
+    # 5. Now tell the system how to handle data input. Position, color, textures, normals, etc
     # position attribute: x, y, z
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
     glEnableVertexAttribArray(0)
@@ -127,6 +134,9 @@ def main():
         ctypes.c_void_p(3 * sizeof(glm.float32)),
     )
     glEnableVertexAttribArray(1)
+
+    # 6. Optionally, we now stop recording VAO by unbinding it. It is not necessary to unbind VBO/EBO separately
+    glBindVertexArray(0)
 
     ourShader = Shader("vertex_shader.vert", "fragment_shader.frag")
 
@@ -186,8 +196,6 @@ def main():
         glClearColor(0.2, 0.3, 0.3, 1)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        # transformations and drawing
-        # ===============================================
         ourShader.use()
 
         # We could've defined this outside the game loop since it stays static
@@ -199,14 +207,17 @@ def main():
         view = camera.get_view_matrix()
         ourShader.setMat4("view", glm.value_ptr(view))
 
+        # Enable the configuration (VAO) that we want to use
+        glBindVertexArray(vao_ID)
+
+        # Draw elements of VAO
         for i in range(len(cubePositions)):
             model = glm.mat4(1.0)
             model = glm.translate(model, cubePositions[i])
 
             ourShader.setMat4("model", glm.value_ptr(model))
 
-            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, None)
-        # ===============================================
+            glDrawElements(GL_TRIANGLES, len(my_indices), GL_UNSIGNED_INT, None)
 
         # display to user
         pg.display.flip()
