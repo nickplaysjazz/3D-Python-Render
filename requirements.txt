@@ -9,5 +9,6 @@ pathlib==1.0.1
 pathspec==1.0.4
 platformdirs==4.9.2
 pygame==2.6.1
+pyglm==2.8.3
 PyOpenGL==3.1.10
 pytokens==0.4.1

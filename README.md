@@ -1,11 +1,21 @@
 ## 3D Python Render
 A simple 3D rendering tool built in PyGame using PyOpenGL for graphics.
 
-### Installation
-To install, run `pip install -r requirements.txt`. Run the application with `python main.py`.
 
-.obj files can be loaded from the `/assets/` folder to be placed in the world.
+### Installation
+Create a virtual environment with pip: `python -m venv render` will create the venv called "render" as a subdirectory.
+
+Activate the virtual environment with `source render/Scripts/activate` or `source render/bin/activate`, depending on your OS. (You can deactivate the virtual environment with `deactivate`.)
+
+If this is your first time installing, install required packages with `pip install -r requirements.txt`. 
+
+Run the program with `python main.py`.
+
+
+### Notes
+This project is a work in progress.
 
 ### TODO
+- Adding objects loaded from `/assets/` folder
 - Lighting system (ambient and diffuse)
 - Textures/materials

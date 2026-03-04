@@ -1,296 +1,146 @@
-import configparser
+import ctypes
 import math
-import numpy as np
 import pygame as pg
 import sys
 
-from pathlib import Path
-from pygame.locals import *
+from enum import Enum
 from OpenGL.GL import *
 from OpenGL.GLU import *
+from pygame.locals import *
+from pyglm import glm
+
+from camera import Camera
+from constants import Directions
+from setting_utils import read_settings
+from shader_utils import Shader
 
 
-class Level:
-    def __init__(self, objects):
-        self.objects = objects
-        self.navmesh = self.update_navmesh()
-        self.navmesh_padding = 0.3
+class newObject:
+    def __init__(self):
+        # fmt: off
+        self.vertices = glm.array(
+            glm.float32,
+            0, 0, 0,  0.1, 0.1, 0.1,
+            1, 0, 0,  0.0, 0.0, 1.0,
+            1, 1, 0,  0.0, 0.0, 0.5,
+            0, 1, 0,  0.0, 1.0, 0.0,
+            0, 1, 1,  0.0, 0.5, 0.0,
+            1, 1, 1,  1.0, 0.0, 0.0,
+            1, 0, 1,  0.5, 0.0, 0.0,
+            0, 0, 1,  0.3, 0.0, 0.3,
+        )
 
-        self.light_color = [1.0, 1.0, 1.0]
-
-    def update_navmesh(self):
-        xz_vertices = [
-            (obj.x1, obj.z1, obj.x1 + obj.width, obj.z1 + obj.depth)
-            for obj in self.objects
-            if obj.clipping == True
-        ]
-        navmesh = self.union_of_rectangles(xz_vertices)
-        return navmesh
-
-    def is_in_navmesh(self, x, z):
-        for n in self.navmesh:
-            if (
-                (x > n[0] - self.navmesh_padding)
-                and (x < n[2] + self.navmesh_padding)
-                and (z > n[1] - self.navmesh_padding)
-                and (z < n[3] + self.navmesh_padding)
-            ):
-                return True
-        return False
-
-    def merge_intervals(self, intervals):
-        if not intervals:
-            return []
-        sorted_intervals = sorted(intervals, key=lambda x: x[0])
-        merged = []
-        curr_start, curr_end = sorted_intervals[0]
-        for nxt_start, nxt_end in sorted_intervals[1:]:
-            if nxt_start <= curr_end:
-                curr_end = max(curr_end, nxt_end)
-            else:
-                merged.append((curr_start, curr_end))
-                curr_start, curr_end = nxt_start, nxt_end
-        merged.append((curr_start, curr_end))
-        return merged
-
-    def union_of_rectangles(self, rects):
-        """
-        rects: List of (x1, z1, x2, z2)
-        Returns: List of disjoint (x1, z1, x2, z2) representing the union.
-        """
-        x_coords = sorted(list(set([r[0] for r in rects] + [r[2] for r in rects])))
-
-        disjoint_rects = []
-
-        for i in range(len(x_coords) - 1):
-            x_start = min(x_coords[i], x_coords[i + 1])
-            x_end = max(x_coords[i], x_coords[i + 1])
-
-            active_z_ranges = []
-            for x1, z1, x2, z2 in rects:
-                if min(x1, x2) <= x_start and max(x1, x2) >= x_end:
-                    active_z_ranges.append((z1, z2))
-
-            merged_z = self.merge_intervals(active_z_ranges)
-
-            for z_start, z_end in merged_z:
-                disjoint_rects.append((x_start, z_start, x_end, z_end))
-
-        return disjoint_rects
-
-
-class Object:
-    def __init__(
-        self,
-        pos,
-        filename,
-        body_color=(0.1, 0.1, 0.1),
-        clipping=True,
-    ):
-        self.x1, self.y1, self.z1 = pos
-        self.filename = filename
-        self.width = None
-        self.depth = None
-
-        self.body_color = body_color
-        self.clipping = clipping
-
-        self.load_obj(filename)
+        self.indices = glm.array(
+            glm.uint32,
+            2,0,3, 
+            0,2,1, 
+            5,1,2, 
+            1,5,6, 
+            4,6,5, 
+            6,4,7, 
+            3,7,4, 
+            7,3,0, 
+            3,5,2, 
+            5,3,4, 
+            7,1,6, 
+            1,7,0, 
+        )       
+        # fmt: on
 
     def draw(self):
-        glPushMatrix()
-        glTranslatef(self.x1, self.y1, self.z1)
-
-        glBegin(GL_TRIANGLES)
-        glColor3fv(self.body_color)
-        for q in self.faces:
-            for v in q:
-                glVertex3fv(self.vertices[v])
-        glEnd()
-
-        glPopMatrix()
-
-    def load_obj(self, filename):
-        BASE_DIR = Path(__file__).resolve().parent
-        assets_path = BASE_DIR / "assets"
-        filename = assets_path / filename
-        self.vertices = []
-        self.faces = []
-
-        with open(filename, "r") as f:
-            for line in f:
-                # lines with v are vertices
-                if line.startswith("v "):
-                    parts = line.split()
-                    v = (float(parts[1]), float(parts[2]), float(parts[3]))
-                    self.vertices.append(v)
-
-                # lines with f are faces
-                elif line.startswith("f "):
-                    parts = line.split()
-                    face = []
-                    for part in parts[1:]:
-                        indices = part.split("/")
-                        # OBJ indices are 1-based, Python is 0-based, so subtract 1
-                        face.append(int(indices[0]) - 1)
-                    self.faces.append(face)
-
-        # Shift min vertex to 0,0,0 for easy translating later
-        mins = np.array(self.vertices).min(axis=0)
-        self.vertices -= mins
-
-        self.width = max([v[0] for v in self.vertices]) - min(
-            [v[0] for v in self.vertices]
-        )
-        self.depth = max([v[2] for v in self.vertices]) - min(
-            [v[2] for v in self.vertices]
-        )
-
-
-class RectangleObject(Object):
-    def __init__(
-        self,
-        pos,
-        size,
-        body_color=(0.1, 0.1, 0.1),
-        clipping=True,
-    ):
-        self.x1, self.y1, self.z1 = pos
-        self.width, self.height, self.depth = size
-
-        self.x2, self.y2, self.z2 = [s + p for s, p in zip(size, pos)]
-
-        self.body_color = body_color
-
-        unscaled_vertices = (
-            (0, 0, 0),
-            (1, 0, 0),
-            (1, 1, 0),
-            (0, 1, 0),
-            (0, 1, 1),
-            (1, 1, 1),
-            (1, 0, 1),
-            (0, 0, 1),
-        )
-        self.vertices = tuple(
-            tuple(
-                (val * s)
-                for val, s in zip(vertex, (self.width, self.height, self.depth))
-            )
-            for vertex in unscaled_vertices
-        )
-        self.quads = (
-            (2, 3, 0, 1),
-            (5, 2, 1, 6),
-            (4, 5, 6, 7),
-            (3, 4, 7, 0),
-            (3, 2, 5, 4),
-            (7, 6, 1, 0),
-        )
-
-        self.clipping = clipping
-
-    def draw(self):
-        glPushMatrix()
-        glTranslatef(self.x1, self.y1, self.z1)
-
-        glBegin(GL_QUADS)
-        glColor3fv(self.body_color)
-        for q in self.quads:
-            for v in q:
-                glVertex3fv(self.vertices[v])
-        glEnd()
-
-        glPopMatrix()
-
-
-def parse_ini():
-    BASE_DIR = Path(__file__).resolve().parent
-    config_path = BASE_DIR / "settings.ini"
-    config = configparser.ConfigParser()
-    config.read(config_path)
-    return config
+        pass
 
 
 def main():
-    RED_TEXT = "\033[31m"
-    RESET_TEXT = "\033[0m"
-    try:
-        settings = parse_ini()
-    except configparser.ParsingError as e:
-        print(
-            f"{RED_TEXT}!! ERROR !! Configuration file does not follow legal syntax:\n{e}{RESET_TEXT}"
-        )
-        sys.exit(1)
+    settings = read_settings("settings.ini")
+    display = (settings["DISPLAY_WIDTH"], settings["DISPLAY_HEIGHT"])
 
-    try:
-        DISPLAY_WIDTH = settings.getint("Options", "DISPLAY_WIDTH")
-        DISPLAY_HEIGHT = settings.getint("Options", "DISPLAY_HEIGHT")
-        FOV = settings.getfloat("Options", "FOV")
-        MOUSE_SENSITIVITY = settings.getfloat("Options", "MOUSE_SENSITIVITY")
-        FPS = settings.getint("Options", "FPS")
-    except ValueError as e:
-        print(f"{RED_TEXT}!! ERROR !! Type mismatch error:\n{e}{RESET_TEXT}")
-        sys.exit(1)
-
+    # Pygame initialization
     pg.init()
-
-    display = (DISPLAY_WIDTH, DISPLAY_HEIGHT)
-
-    # Double buffering means we can transform one buffer while leaving the visible one untouched
     pg.display.set_mode(display, DOUBLEBUF | OPENGL)
     pg.mouse.set_visible(False)
     pg.event.set_grab(True)  # Lock mouse to window
 
-    # Define system geometry
-    levelMap = Level(
-        objects=[
-            RectangleObject(
-                pos=(-15, -1.1, -15),
-                size=(30, 0.1, 30),
-                body_color=(0.1, 0.1, 0.1),
-                clipping=False,
-            ),
-            RectangleObject(
-                pos=(-10, -1, -10),
-                size=(5, 5, 5),
-                body_color=(0, 0.2, 0),
-                clipping=True,
-            ),
-            Object(
-                pos=(5, -1, 5),
-                body_color=(0.5, 0, 0),
-                filename="cylinder.obj",
-                clipping=True,
-            ),
-            Object(
-                pos=(-5, -0.6, 5),
-                body_color=(0, 0, 0.5),
-                filename="torus.obj",
-                clipping=True,
-            ),
-        ]
+    clock = pg.time.Clock()
+
+    # Define geometry now
+    my_object = newObject()
+    my_vertices = my_object.vertices
+    my_indices = my_object.indices
+
+    cubePositions = (
+        glm.vec3(2.0, 5.0, -15.0),
+        glm.vec3(-1.5, -2.2, -2.5),
+        glm.vec3(-3.8, -2.0, -12.3),
+        glm.vec3(2.4, -0.4, -3.5),
+        glm.vec3(-1.7, 3.0, -7.5),
+        glm.vec3(1.3, -2.0, -2.5),
+        glm.vec3(1.5, 2.0, -2.5),
+        glm.vec3(1.5, 0.2, -1.5),
+        glm.vec3(-1.3, 1.0, -1.5),
     )
 
+    # Initialization code, should be done only once
+    vao_ID = glGenVertexArrays(1)
+    vbo_ID = glGenBuffers(1)
+    ebo_ID = glGenBuffers(1)
+
+    glBindVertexArray(vao_ID)
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_ID)
+    glBufferData(
+        GL_ARRAY_BUFFER,
+        my_vertices.nbytes,
+        my_vertices.ptr,
+        GL_STATIC_DRAW,
+    )
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_ID)
+    glBufferData(
+        GL_ELEMENT_ARRAY_BUFFER, my_indices.nbytes, my_indices.ptr, GL_STATIC_DRAW
+    )
+
+    # position attribute
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
+    glEnableVertexAttribArray(0)
+    # color attribute
+    glVertexAttribPointer(
+        1,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        6 * glm.sizeof(glm.float32),
+        ctypes.c_void_p(3 * sizeof(glm.float32)),
+    )
+    glEnableVertexAttribArray(1)
+
+    ourShader = Shader("vertex_shader.vert", "fragment_shader.frag")
+
     # Defines camera "frustrum"
-    gluPerspective(FOV, (display[0] / display[1]), 0.1, 100.0)
     glEnable(GL_DEPTH_TEST)
     glDepthFunc(GL_LESS)
     glEnable(GL_CULL_FACE)
-    glEnable(GL_LINE_SMOOTH)
 
-    clock = pg.time.Clock()
+    # Player starting position and camera variables
+    camera = Camera(
+        yaw=-90.0,
+        pitch=0.0,
+        speed=0.02,
+        sensitivity=settings["MOUSE_SENSITIVITY"],
+        fov=settings["FOV"],
+        pos=glm.vec3(0.0, 0.0, 3.0),
+        up=glm.vec3(0, 1, 0),
+        front=glm.vec3(0, 0, -1),
+    )
 
-    # Player Starting Position & Camera
-    cam_x, cam_y, cam_z = 0, 0, 0
-    # cube_rotation = 0
-    yaw, pitch = 0.0, 0.0
-    move_speed = 0.1
-    mouse_sensitivity = MOUSE_SENSITIVITY
-
-    glTranslatef(cam_x, cam_y, cam_z)
+    # We will need to keep track of ticks
+    current_ticks = 0
+    last_ticks = 0
 
     while True:
+        # Count frames rendered
+        current_ticks = pg.time.get_ticks()
+        delta_ticks = current_ticks - last_ticks
+        last_ticks = current_ticks
+
         # handle events
         for event in pg.event.get():
             if event.type == pg.QUIT:
@@ -301,74 +151,53 @@ def main():
                     pg.quit()
                     sys.exit()
 
-        mouse_dx, mouse_dy = pg.mouse.get_rel()
-        yaw += mouse_dx * mouse_sensitivity
-        yaw = np.mod(yaw, 360)
-        pitch += mouse_dy * mouse_sensitivity
-        pitch = max(-89.0, min(89.0, pitch))
-
         keys = pg.key.get_pressed()
-        yaw_rad = math.radians(yaw)
-
-        # Calculate forward and right vectors based on yaw
-        forward_x = math.sin(yaw_rad)
-        forward_z = -math.cos(yaw_rad)
-        right_x = math.cos(yaw_rad)
-        right_z = math.sin(yaw_rad)
-
-        dx, dz = 0, 0
         if keys[pg.K_w]:
-            dx += forward_x * move_speed
-            dz += forward_z * move_speed
+            camera.process_keyboard(Directions.FORWARD, delta_ticks)
         if keys[pg.K_s]:
-            dx -= forward_x * move_speed
-            dz -= forward_z * move_speed
+            camera.process_keyboard(Directions.BACKWARD, delta_ticks)
         if keys[pg.K_a]:
-            dx -= right_x * move_speed
-            dz -= right_z * move_speed
+            camera.process_keyboard(Directions.LEFT, delta_ticks)
         if keys[pg.K_d]:
-            dx += right_x * move_speed
-            dz += right_z * move_speed
+            camera.process_keyboard(Directions.RIGHT, delta_ticks)
 
-        if not levelMap.is_in_navmesh(cam_x + dx, cam_z):
-            cam_x += dx
-
-        if not levelMap.is_in_navmesh(cam_x, cam_z + dz):
-            cam_z += dz
+        mouse_dx, mouse_dy = pg.mouse.get_rel()
+        camera.process_mouse_movement(mouse_dx, mouse_dy, constrain_pitch=True)
 
         # clear previous screen
+        glClearColor(0.2, 0.3, 0.3, 1)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         # transformations and drawing
         # ===============================================
-        glPushMatrix()
+        ourShader.use()
 
-        # Camera
-        glRotatef(pitch, 1, 0, 0)
-        glRotatef(yaw, 0, 1, 0)
-        glTranslatef(-cam_x, -cam_y, -cam_z)
+        projection = glm.perspective(
+            glm.radians(settings["FOV"]), (display[0] / display[1]), 0.1, 100.0
+        )
+        ourShader.setMat4("projection", glm.value_ptr(projection))
 
-        # Static objects
-        for obj in levelMap.objects:
-            obj.draw()
+        view = camera.get_view_matrix()
+        ourShader.setMat4("view", glm.value_ptr(view))
 
-        # Moving objects should be handled with individual matrices
-        # glPushMatrix()
-        # glRotatef(cube_rotation, 1, 1, 1)
-        # draw_wire_cube()
-        # glPopMatrix()
+        glBindVertexArray(vao_ID)
+        for i in range(len(cubePositions)):
+            model = glm.mat4(1.0)
+            model = glm.translate(model, cubePositions[i])
 
-        glPopMatrix()
+            ourShader.setMat4("model", glm.value_ptr(model))
+
+            glDrawElements(GL_TRIANGLES, 36, GL_UNSIGNED_INT, None)
         # ===============================================
-
-        # Update any states here for e.g. animations
-        # cube_rotation += 1
 
         # display to user
         pg.display.flip()
 
         # wait at 60 fps
-        clock.tick(FPS)
+        clock.tick(settings["FPS"])
+
+        # Actual FPS
+        # clock.get_fps()
 
 
 if __name__ == "__main__":
