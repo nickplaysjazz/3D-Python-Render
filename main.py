@@ -18,32 +18,55 @@ from shader_utils import Shader
 class newObject:
     def __init__(self):
         # fmt: off
+        # vertices, colors, normals
         self.vertices = glm.array(
             glm.float32,
-            0, 0, 0,  0.1, 0.1, 0.1,
-            1, 0, 0,  0.0, 0.0, 1.0,
-            1, 1, 0,  0.0, 0.0, 0.5,
-            0, 1, 0,  0.0, 1.0, 0.0,
-            0, 1, 1,  0.0, 0.5, 0.0,
-            1, 1, 1,  1.0, 0.0, 0.0,
-            1, 0, 1,  0.5, 0.0, 0.0,
-            0, 0, 1,  0.3, 0.0, 0.3,
+            # Position          # Normal
+            # Back Face (z=0)
+            0.0, 0.0, 0.0,      0.0,  0.0, -1.0,
+            1.0, 0.0, 0.0,      0.0,  0.0, -1.0,
+            1.0, 1.0, 0.0,      0.0,  0.0, -1.0,
+            0.0, 1.0, 0.0,      0.0,  0.0, -1.0,
+
+            # Front Face (z=1)
+            0.0, 0.0, 1.0,      0.0,  0.0,  1.0,
+            1.0, 0.0, 1.0,      0.0,  0.0,  1.0,
+            1.0, 1.0, 1.0,      0.0,  0.0,  1.0,
+            0.0, 1.0, 1.0,      0.0,  0.0,  1.0,
+
+            # Left Face (x=0)
+            0.0, 1.0, 1.0,     -1.0,  0.0,  0.0,
+            0.0, 1.0, 0.0,     -1.0,  0.0,  0.0,
+            0.0, 0.0, 0.0,     -1.0,  0.0,  0.0,
+            0.0, 0.0, 1.0,     -1.0,  0.0,  0.0,
+
+            # Right Face (x=1)
+            1.0, 1.0, 1.0,      1.0,  0.0,  0.0,
+            1.0, 1.0, 0.0,      1.0,  0.0,  0.0,
+            1.0, 0.0, 0.0,      1.0,  0.0,  0.0,
+            1.0, 0.0, 1.0,      1.0,  0.0,  0.0,
+
+            # Bottom Face (y=0)
+            0.0, 0.0, 0.0,      0.0, -1.0,  0.0,
+            1.0, 0.0, 0.0,      0.0, -1.0,  0.0,
+            1.0, 0.0, 1.0,      0.0, -1.0,  0.0,
+            0.0, 0.0, 1.0,      0.0, -1.0,  0.0,
+
+            # Top Face (y=1)
+            0.0, 1.0, 0.0,      0.0,  1.0,  0.0,
+            1.0, 1.0, 0.0,      0.0,  1.0,  0.0,
+            1.0, 1.0, 1.0,      0.0,  1.0,  0.0,
+            0.0, 1.0, 1.0,      0.0,  1.0,  0.0
         )
 
         self.indices = glm.array(
             glm.uint32,
-            2, 0, 3, 
-            0, 2, 1, 
-            5, 1, 2, 
-            1, 5, 6, 
-            4, 6, 5, 
-            6, 4, 7, 
-            3, 7, 4, 
-            7, 3, 0, 
-            3, 5, 2, 
-            5, 3, 4, 
-            7, 1, 6, 
-            1, 7, 0, 
+            0,  1,  2,   2,  3,  0,   # Back
+            4,  5,  6,   6,  7,  4,   # Front
+            8,  9,  10,  10, 11, 8,   # Left
+            12, 13, 14,  14, 15, 12,  # Right
+            16, 17, 18,  18, 19, 16,  # Bottom
+            20, 21, 22,  22, 23, 20   # Top
         )       
         # fmt: on
 
@@ -123,14 +146,14 @@ def main():
     # position attribute: x, y, z
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
     glEnableVertexAttribArray(0)
-    # color attribute: r, g, b
+    # normals
     glVertexAttribPointer(
         1,
         3,
         GL_FLOAT,
         GL_FALSE,
         6 * glm.sizeof(glm.float32),
-        ctypes.c_void_p(3 * sizeof(glm.float32)),
+        ctypes.c_void_p(3 * glm.sizeof(glm.float32)),
     )
     glEnableVertexAttribArray(1)
     # 6. Optionally, we now stop recording VAO by unbinding it. It is not necessary to unbind VBO/EBO separately
@@ -149,7 +172,7 @@ def main():
         GL_FLOAT,
         GL_FALSE,
         6 * glm.sizeof(glm.float32),
-        ctypes.c_void_p(3 * sizeof(glm.float32)),
+        ctypes.c_void_p(3 * glm.sizeof(glm.float32)),
     )
     glEnableVertexAttribArray(1)
     glBindVertexArray(0)
@@ -163,7 +186,7 @@ def main():
     glEnable(GL_DEPTH_TEST)
     glDepthFunc(GL_LESS)
     # Also do not render backfaces to save render time
-    glEnable(GL_CULL_FACE)
+    # glEnable(GL_CULL_FACE)
 
     # Player starting position and camera variables
     camera = Camera(
@@ -218,6 +241,9 @@ def main():
         lighting_shader.use()
         lighting_shader.setVec3("objectColor", 1.0, 0.5, 0.31)
         lighting_shader.setVec3("lightColor", 1.0, 1.0, 1.0)
+        lighting_shader.setVec3(
+            "lightPos", light_object_pos.x, light_object_pos.y, light_object_pos.z
+        )
 
         # We could've defined this outside the game loop since it stays static
         projection = glm.perspective(

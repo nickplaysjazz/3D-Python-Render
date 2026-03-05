@@ -17,5 +17,7 @@ This project is a work in progress.
 
 ### TODO
 - Adding objects loaded from `/assets/` folder
-- Lighting system (ambient and diffuse)
+- Fix CCW definitions of triangular cube faces, disabled CULL_FACE in the meantime
+- Mobile lighting
+- Specular lighting?
 - Textures/materials
