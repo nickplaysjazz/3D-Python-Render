@@ -71,3 +71,6 @@ class Shader:
 
     def setMat4(self, name, value):
         glUniformMatrix4fv(glGetUniformLocation(self.ID, name), 1, GL_FALSE, value)
+
+    def setVec3(self, name, x, y, z):
+        glUniform3f(glGetUniformLocation(self.ID, name), x, y, z)

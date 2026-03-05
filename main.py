@@ -84,6 +84,8 @@ def main():
     my_vertices = my_object.vertices
     my_indices = my_object.indices
 
+    light_object_pos = glm.vec3(1.0, 3.0, 2.0)
+
     cubePositions = (
         glm.vec3(2.0, 5.0, -15.0),
         glm.vec3(-1.5, -2.2, -2.5),
@@ -104,7 +106,6 @@ def main():
 
     # 2. Start recording into a VAO by binding it
     glBindVertexArray(vao_ID)
-
     # 3. Bind VBO, which stores vertices
     glBindBuffer(GL_ARRAY_BUFFER, vbo_ID)
     glBufferData(
@@ -113,13 +114,11 @@ def main():
         my_vertices.ptr,
         GL_STATIC_DRAW,
     )
-
     # 4. Bind EBO, which stores indices to create faces
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_ID)
     glBufferData(
         GL_ELEMENT_ARRAY_BUFFER, my_indices.nbytes, my_indices.ptr, GL_STATIC_DRAW
     )
-
     # 5. Now tell the system how to handle data input. Position, color, textures, normals, etc
     # position attribute: x, y, z
     glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
@@ -134,11 +133,31 @@ def main():
         ctypes.c_void_p(3 * sizeof(glm.float32)),
     )
     glEnableVertexAttribArray(1)
-
     # 6. Optionally, we now stop recording VAO by unbinding it. It is not necessary to unbind VBO/EBO separately
     glBindVertexArray(0)
 
-    ourShader = Shader("vertex_shader.vert", "fragment_shader.frag")
+    # Light VAO
+    light_vao = glGenVertexArrays(1)
+    glBindVertexArray(light_vao)
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_ID)
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_ID)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
+    glEnableVertexAttribArray(0)
+    glVertexAttribPointer(
+        1,
+        3,
+        GL_FLOAT,
+        GL_FALSE,
+        6 * glm.sizeof(glm.float32),
+        ctypes.c_void_p(3 * sizeof(glm.float32)),
+    )
+    glEnableVertexAttribArray(1)
+    glBindVertexArray(0)
+
+    lighting_shader = Shader("vertex_shader.vert", "fragment_shader.frag")
+    light_object_shader = Shader(
+        "vertex_shader.vert", "light_object_fragment_shader.frag"
+    )
 
     # Enable depth testing for drawing objects in correct order
     glEnable(GL_DEPTH_TEST)
@@ -193,19 +212,21 @@ def main():
         camera.process_mouse_movement(mouse_dx, -mouse_dy, constrain_pitch=True)
 
         # clear previous screen
-        glClearColor(0.2, 0.3, 0.3, 1)
+        glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
-        ourShader.use()
+        lighting_shader.use()
+        lighting_shader.setVec3("objectColor", 1.0, 0.5, 0.31)
+        lighting_shader.setVec3("lightColor", 1.0, 1.0, 1.0)
 
         # We could've defined this outside the game loop since it stays static
         projection = glm.perspective(
             glm.radians(settings["FOV"]), (display[0] / display[1]), 0.1, 100.0
         )
-        ourShader.setMat4("projection", glm.value_ptr(projection))
+        lighting_shader.setMat4("projection", glm.value_ptr(projection))
 
         view = camera.get_view_matrix()
-        ourShader.setMat4("view", glm.value_ptr(view))
+        lighting_shader.setMat4("view", glm.value_ptr(view))
 
         # Enable the configuration (VAO) that we want to use
         glBindVertexArray(vao_ID)
@@ -214,10 +235,18 @@ def main():
         for i in range(len(cubePositions)):
             model = glm.mat4(1.0)
             model = glm.translate(model, cubePositions[i])
-
-            ourShader.setMat4("model", glm.value_ptr(model))
-
+            lighting_shader.setMat4("model", glm.value_ptr(model))
             glDrawElements(GL_TRIANGLES, len(my_indices), GL_UNSIGNED_INT, None)
+
+        glBindVertexArray(light_vao)
+        light_object_shader.use()
+        light_object_shader.setMat4("projection", glm.value_ptr(projection))
+        light_object_shader.setMat4("view", glm.value_ptr(view))
+        model = glm.mat4(1.0)
+        model = glm.translate(model, light_object_pos)
+        model = glm.scale(model, glm.vec3(0.2))
+        light_object_shader.setMat4("model", glm.value_ptr(model))
+        glDrawElements(GL_TRIANGLES, len(my_indices), GL_UNSIGNED_INT, None)
 
         # display to user
         pg.display.flip()
