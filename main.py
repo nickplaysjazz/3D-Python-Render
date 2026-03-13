@@ -1,4 +1,5 @@
 import ctypes
+import itertools
 import pygame as pg
 import sys
 
@@ -15,8 +16,8 @@ from setting_utils import read_settings
 from shader_utils import Shader
 
 
-class newObject:
-    def __init__(self):
+class Object:
+    def __init__(self, pos, lighting_shader):
         # fmt: off
         # vertices, colors, normals
         self.vertices = glm.array(
@@ -70,14 +71,109 @@ class newObject:
         )       
         # fmt: on
 
-    def draw(self):
-        pass
+        self.pos = pos
+        self.lighting_shader = lighting_shader
 
 
-def main():
-    settings = read_settings("settings.ini")
-    display = (settings["DISPLAY_WIDTH"], settings["DISPLAY_HEIGHT"])
+class Level:
+    def __init__(self, object_list, light_object_list):
+        self.vao = glGenVertexArrays(1)
+        self.vbo = glGenBuffers(1)
+        self.ebo = glGenBuffers(1)
 
+        self.vao_lighting_obj = glGenVertexArrays(1)
+
+        self.object_list = object_list
+
+        chained_all_vertices = itertools.chain.from_iterable(
+            [o.vertices for o in object_list]
+        )
+        chained_all_indices = itertools.chain.from_iterable(
+            [o.indices for o in object_list]
+        )
+
+        self.all_vertices = glm.array(glm.float32, *list(chained_all_vertices))
+        self.all_indices = glm.array(glm.uint32, *list(chained_all_indices))
+
+        self.light_object_list = light_object_list
+
+        # Some OpenGL initialization
+        # 1. Generate OpenGL components
+        # 2. Start recording into a VAO by binding it
+        # 3. Bind VBO, which stores vertices
+        # 4. Bind EBO, which stores indices to create faces
+        # 5. Now tell the system how to handle data input. Position, color, textures, normals, etc
+        # 6. Optionally, we now stop recording VAO by unbinding it. It is not necessary to unbind VBO/EBO separately
+
+        glBindVertexArray(self.vao)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+        glBufferData(
+            GL_ARRAY_BUFFER,
+            self.all_vertices.nbytes,
+            self.all_vertices.ptr,
+            GL_STATIC_DRAW,
+        )
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
+        glBufferData(
+            GL_ELEMENT_ARRAY_BUFFER,
+            self.all_indices.nbytes,
+            self.all_indices.ptr,
+            GL_STATIC_DRAW,
+        )
+        # position attribute: x, y, z
+        glVertexAttribPointer(
+            0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None
+        )
+        glEnableVertexAttribArray(0)
+        # normals
+        glVertexAttribPointer(
+            1,
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            6 * glm.sizeof(glm.float32),
+            ctypes.c_void_p(3 * glm.sizeof(glm.float32)),
+        )
+        glEnableVertexAttribArray(1)
+        glBindVertexArray(0)
+
+        # Light VAO
+        glBindVertexArray(self.vao_lighting_obj)
+        glBindBuffer(GL_ARRAY_BUFFER, self.vbo)
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, self.ebo)
+        glVertexAttribPointer(
+            0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None
+        )
+        glEnableVertexAttribArray(0)
+        glVertexAttribPointer(
+            1,
+            3,
+            GL_FLOAT,
+            GL_FALSE,
+            6 * glm.sizeof(glm.float32),
+            ctypes.c_void_p(3 * glm.sizeof(glm.float32)),
+        )
+        glEnableVertexAttribArray(1)
+        glBindVertexArray(0)
+
+
+def draw_objects(current_vao, objects, current_shader, projection, view):
+    # Enable the configuration (VAO) that we want to use
+    glBindVertexArray(current_vao)
+
+    # Draw elements of VAO
+    # Assume one shader for simplicity
+    current_shader.use()
+    current_shader.setMat4("projection", glm.value_ptr(projection))
+    current_shader.setMat4("view", glm.value_ptr(view))
+    for i in objects:
+        model = glm.mat4(1.0)
+        model = glm.translate(model, i.pos)
+        current_shader.setMat4("model", glm.value_ptr(model))
+        glDrawElements(GL_TRIANGLES, len(i.indices), GL_UNSIGNED_INT, None)
+
+
+def init_pg(display):
     # Pygame initialization
     pg.init()
     # Request OpenGL 3.3 context, fixes opengl error on Mac
@@ -100,15 +196,23 @@ def main():
     pg.mouse.set_visible(False)
     pg.event.set_grab(True)  # Lock mouse to window
 
-    clock = pg.time.Clock()
+
+def main():
+    settings = read_settings("settings.ini")
+    display = (settings["DISPLAY_WIDTH"], settings["DISPLAY_HEIGHT"])
+
+    init_pg(display)
+
+    lighting_shader = Shader("vertex_shader.vert", "fragment_shader.frag")
+    lighting_shader.use()
+    lighting_shader.setVec3("objectColor", 1.0, 0.5, 0.31)
+    lighting_shader.setVec3("lightColor", 1.0, 1.0, 1.0)
+
+    light_object_shader = Shader(
+        "vertex_shader.vert", "light_object_fragment_shader.frag"
+    )
 
     # Define geometry now
-    my_object = newObject()
-    my_vertices = my_object.vertices
-    my_indices = my_object.indices
-
-    light_object_pos = glm.vec3(1.0, 3.0, 2.0)
-
     cubePositions = (
         glm.vec3(2.0, 5.0, -15.0),
         glm.vec3(-1.5, -2.2, -2.5),
@@ -120,67 +224,12 @@ def main():
         glm.vec3(1.5, 0.2, -1.5),
         glm.vec3(-1.3, 1.0, -1.5),
     )
+    light_object_pos = glm.vec3(5, 3.0, 0)
 
-    # Some OpenGL initialization
-    # 1. Generate OpenGL components
-    vao_ID = glGenVertexArrays(1)
-    vbo_ID = glGenBuffers(1)
-    ebo_ID = glGenBuffers(1)
+    my_objects_list = [Object(c, lighting_shader) for c in cubePositions]
+    my_lighting_object_list = [Object(light_object_pos, light_object_shader)]
 
-    # 2. Start recording into a VAO by binding it
-    glBindVertexArray(vao_ID)
-    # 3. Bind VBO, which stores vertices
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_ID)
-    glBufferData(
-        GL_ARRAY_BUFFER,
-        my_vertices.nbytes,
-        my_vertices.ptr,
-        GL_STATIC_DRAW,
-    )
-    # 4. Bind EBO, which stores indices to create faces
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_ID)
-    glBufferData(
-        GL_ELEMENT_ARRAY_BUFFER, my_indices.nbytes, my_indices.ptr, GL_STATIC_DRAW
-    )
-    # 5. Now tell the system how to handle data input. Position, color, textures, normals, etc
-    # position attribute: x, y, z
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
-    glEnableVertexAttribArray(0)
-    # normals
-    glVertexAttribPointer(
-        1,
-        3,
-        GL_FLOAT,
-        GL_FALSE,
-        6 * glm.sizeof(glm.float32),
-        ctypes.c_void_p(3 * glm.sizeof(glm.float32)),
-    )
-    glEnableVertexAttribArray(1)
-    # 6. Optionally, we now stop recording VAO by unbinding it. It is not necessary to unbind VBO/EBO separately
-    glBindVertexArray(0)
-
-    # Light VAO
-    light_vao = glGenVertexArrays(1)
-    glBindVertexArray(light_vao)
-    glBindBuffer(GL_ARRAY_BUFFER, vbo_ID)
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo_ID)
-    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None)
-    glEnableVertexAttribArray(0)
-    glVertexAttribPointer(
-        1,
-        3,
-        GL_FLOAT,
-        GL_FALSE,
-        6 * glm.sizeof(glm.float32),
-        ctypes.c_void_p(3 * glm.sizeof(glm.float32)),
-    )
-    glEnableVertexAttribArray(1)
-    glBindVertexArray(0)
-
-    lighting_shader = Shader("vertex_shader.vert", "fragment_shader.frag")
-    light_object_shader = Shader(
-        "vertex_shader.vert", "light_object_fragment_shader.frag"
-    )
+    my_level = Level(my_objects_list, my_lighting_object_list)
 
     # Enable depth testing for drawing objects in correct order
     glEnable(GL_DEPTH_TEST)
@@ -188,7 +237,8 @@ def main():
     # Also do not render backfaces to save render time
     # glEnable(GL_CULL_FACE)
 
-    # Player starting position and camera variables
+    clock = pg.time.Clock()
+
     camera = Camera(
         yaw=-90.0,
         pitch=0.0,
@@ -204,7 +254,6 @@ def main():
     # We will need to keep track of ticks
     current_ticks = 0
     last_ticks = 0
-
     while True:
         # Count frames rendered
         current_ticks = pg.time.get_ticks()
@@ -238,9 +287,12 @@ def main():
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
+        rad = pg.time.get_ticks() / 1000
+        light_object_pos = glm.vec3(5 * glm.cos(rad), 3.0, 5 * glm.sin(rad))
+
+        my_level.light_object_list[0].pos = light_object_pos
+
         lighting_shader.use()
-        lighting_shader.setVec3("objectColor", 1.0, 0.5, 0.31)
-        lighting_shader.setVec3("lightColor", 1.0, 1.0, 1.0)
         lighting_shader.setVec3(
             "lightPos", light_object_pos.x, light_object_pos.y, light_object_pos.z
         )
@@ -249,30 +301,19 @@ def main():
         projection = glm.perspective(
             glm.radians(settings["FOV"]), (display[0] / display[1]), 0.1, 100.0
         )
-        lighting_shader.setMat4("projection", glm.value_ptr(projection))
 
         view = camera.get_view_matrix()
-        lighting_shader.setMat4("view", glm.value_ptr(view))
 
-        # Enable the configuration (VAO) that we want to use
-        glBindVertexArray(vao_ID)
-
-        # Draw elements of VAO
-        for i in range(len(cubePositions)):
-            model = glm.mat4(1.0)
-            model = glm.translate(model, cubePositions[i])
-            lighting_shader.setMat4("model", glm.value_ptr(model))
-            glDrawElements(GL_TRIANGLES, len(my_indices), GL_UNSIGNED_INT, None)
-
-        glBindVertexArray(light_vao)
-        light_object_shader.use()
-        light_object_shader.setMat4("projection", glm.value_ptr(projection))
-        light_object_shader.setMat4("view", glm.value_ptr(view))
-        model = glm.mat4(1.0)
-        model = glm.translate(model, light_object_pos)
-        model = glm.scale(model, glm.vec3(0.2))
-        light_object_shader.setMat4("model", glm.value_ptr(model))
-        glDrawElements(GL_TRIANGLES, len(my_indices), GL_UNSIGNED_INT, None)
+        draw_objects(
+            my_level.vao, my_level.object_list, lighting_shader, projection, view
+        )
+        draw_objects(
+            my_level.vao_lighting_obj,
+            my_level.light_object_list,
+            light_object_shader,
+            projection,
+            view,
+        )
 
         # display to user
         pg.display.flip()
@@ -281,7 +322,7 @@ def main():
         clock.tick(settings["FPS"])
 
         # Actual FPS
-        # print(clock.get_fps())
+    # print(clock.get_fps())
 
 
 if __name__ == "__main__":

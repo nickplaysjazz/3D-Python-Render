@@ -18,6 +18,8 @@ This project is a work in progress.
 ### TODO
 - Adding objects loaded from `/assets/` folder
 - Fix CCW definitions of triangular cube faces, disabled CULL_FACE in the meantime
+- Add colors to objects
+- Textures
 - Mobile lighting
 - Specular lighting?
 - Textures/materials
