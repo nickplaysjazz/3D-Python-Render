@@ -1,5 +1,5 @@
+import array
 import ctypes
-import itertools
 import pygame as pg
 import sys
 
@@ -17,62 +17,90 @@ from shader_utils import Shader
 
 
 class Object:
-    def __init__(self, pos, lighting_shader):
-        # fmt: off
-        # vertices, colors, normals
-        self.vertices = glm.array(
-            glm.float32,
-            # Position          # Normal
-            # Back Face (z=0)
-            0.0, 0.0, 0.0,      0.0,  0.0, -1.0,
-            1.0, 0.0, 0.0,      0.0,  0.0, -1.0,
-            1.0, 1.0, 0.0,      0.0,  0.0, -1.0,
-            0.0, 1.0, 0.0,      0.0,  0.0, -1.0,
-
-            # Front Face (z=1)
-            0.0, 0.0, 1.0,      0.0,  0.0,  1.0,
-            1.0, 0.0, 1.0,      0.0,  0.0,  1.0,
-            1.0, 1.0, 1.0,      0.0,  0.0,  1.0,
-            0.0, 1.0, 1.0,      0.0,  0.0,  1.0,
-
-            # Left Face (x=0)
-            0.0, 1.0, 1.0,     -1.0,  0.0,  0.0,
-            0.0, 1.0, 0.0,     -1.0,  0.0,  0.0,
-            0.0, 0.0, 0.0,     -1.0,  0.0,  0.0,
-            0.0, 0.0, 1.0,     -1.0,  0.0,  0.0,
-
-            # Right Face (x=1)
-            1.0, 1.0, 1.0,      1.0,  0.0,  0.0,
-            1.0, 1.0, 0.0,      1.0,  0.0,  0.0,
-            1.0, 0.0, 0.0,      1.0,  0.0,  0.0,
-            1.0, 0.0, 1.0,      1.0,  0.0,  0.0,
-
-            # Bottom Face (y=0)
-            0.0, 0.0, 0.0,      0.0, -1.0,  0.0,
-            1.0, 0.0, 0.0,      0.0, -1.0,  0.0,
-            1.0, 0.0, 1.0,      0.0, -1.0,  0.0,
-            0.0, 0.0, 1.0,      0.0, -1.0,  0.0,
-
-            # Top Face (y=1)
-            0.0, 1.0, 0.0,      0.0,  1.0,  0.0,
-            1.0, 1.0, 0.0,      0.0,  1.0,  0.0,
-            1.0, 1.0, 1.0,      0.0,  1.0,  0.0,
-            0.0, 1.0, 1.0,      0.0,  1.0,  0.0
-        )
-
-        self.indices = glm.array(
-            glm.uint32,
-            0,  1,  2,   2,  3,  0,   # Back
-            4,  5,  6,   6,  7,  4,   # Front
-            8,  9,  10,  10, 11, 8,   # Left
-            12, 13, 14,  14, 15, 12,  # Right
-            16, 17, 18,  18, 19, 16,  # Bottom
-            20, 21, 22,  22, 23, 20   # Top
-        )       
-        # fmt: on
-
+    def __init__(
+        self,
+        pos,
+        filename=None,
+        lighting_shader=None,
+    ):
         self.pos = pos
+        self.filename = filename
         self.lighting_shader = lighting_shader
+
+        self.vertices = None
+        self.indices = None
+
+        # Tracking for global buffers
+        self.index_count = 0
+        self.byte_offset = 0
+
+        ASSET_DIR = Path(__file__).resolve().parent / "assets"
+        self.filepath = ASSET_DIR / self.filename
+        if filename:
+            self.load_obj()
+            self.index_count = len(self.indices)
+
+    def load_obj(self):
+        raw_v = []
+        raw_vn = []
+
+        # Unique (Position, Normal) tuples as keys and their assigned index as values
+        vertex_cache = {}
+
+        # quick double check for cross-compatability
+        if array.array("I").itemsize != 4:
+            raise_error(
+                Path(__file__).name,
+                "Expected 32-bit unsigned integers. Change type code in load_obj()?",
+            )
+        if array.array("f").itemsize != 4:
+            raise_error(
+                Path(__file__).name,
+                "Expected 32-bit floats. Change type code in load_obj()?",
+            )
+
+        # float is 4 byte = 32 bits
+        self.vertices = array.array("f")
+        # unsigned 4 byte = 32-bit integers
+        self.indices = array.array("I")
+        current_index = 0
+
+        with open(self.filepath, "r") as f:
+            for line in f:
+                if line.startswith("v "):
+                    raw_v.append([float(x) for x in line.split()[1:]])
+                elif line.startswith("vn "):
+                    raw_vn.append([float(x) for x in line.split()[1:]])
+                elif line.startswith("f "):
+                    parts = line.split()[1:]
+                    for part in parts:
+                        # Extract indices from string (v/vt/vn)
+                        idx_parts = part.split("/")
+                        v_idx = int(idx_parts[0]) - 1
+                        vn_idx = (
+                            (int(idx_parts[2]) - 1)
+                            if (len(idx_parts) >= 3 and idx_parts[2])
+                            else None
+                        )
+
+                        pos = tuple(raw_v[v_idx])
+                        norm = (
+                            tuple(raw_vn[vn_idx])
+                            if vn_idx is not None
+                            else (0.0, 1.0, 0.0)
+                        )
+                        vertex_package = (pos, norm)
+
+                        # Check if vertex has already been seen
+                        if vertex_package in vertex_cache:
+                            self.indices.append(vertex_cache[vertex_package])
+                        else:
+                            vertex_cache[vertex_package] = current_index
+                            self.indices.append(current_index)
+
+                            self.vertices.extend(pos)
+                            self.vertices.extend(norm)
+                            current_index += 1
 
 
 class Level:
@@ -84,18 +112,34 @@ class Level:
         self.vao_lighting_obj = glGenVertexArrays(1)
 
         self.object_list = object_list
-
-        chained_all_vertices = itertools.chain.from_iterable(
-            [o.vertices for o in object_list]
-        )
-        chained_all_indices = itertools.chain.from_iterable(
-            [o.indices for o in object_list]
-        )
-
-        self.all_vertices = glm.array(glm.float32, *list(chained_all_vertices))
-        self.all_indices = glm.array(glm.uint32, *list(chained_all_indices))
-
         self.light_object_list = light_object_list
+
+        all_objs = object_list + light_object_list
+
+        current_v_offset = 0
+        current_i_offset = 0
+
+        processed_vertices = []
+        processed_indices = []
+
+        for obj in all_objs:
+            # Store the byte offset for glDrawElements
+            # (Index count so far * size of uint32)
+            obj.byte_offset = current_i_offset * sizeof(int32_t)
+
+            # offset the indices themselves so they point to the correct vertices in the combined VBO
+            offset_indices = [i + current_v_offset for i in obj.indices]
+
+            processed_vertices.extend(obj.vertices)
+            processed_indices.extend(offset_indices)
+
+            # Increment offsets for the NEXT object
+            # vertices are stored as [x,y,z,nx,ny,nz], so divide by 6 for count
+            current_v_offset += len(obj.vertices) // 6
+            current_i_offset += len(obj.indices)
+
+        self.all_vertices = glm.array(glm.float32, *processed_vertices)
+        self.all_indices = glm.array(glm.uint32, *processed_indices)
 
         # Some OpenGL initialization
         # 1. Generate OpenGL components
@@ -125,7 +169,7 @@ class Level:
             0, 3, GL_FLOAT, GL_FALSE, 6 * glm.sizeof(glm.float32), None
         )
         glEnableVertexAttribArray(0)
-        # normals
+        # normals nx, ny, nz
         glVertexAttribPointer(
             1,
             3,
@@ -170,7 +214,9 @@ def draw_objects(current_vao, objects, current_shader, projection, view):
         model = glm.mat4(1.0)
         model = glm.translate(model, i.pos)
         current_shader.setMat4("model", glm.value_ptr(model))
-        glDrawElements(GL_TRIANGLES, len(i.indices), GL_UNSIGNED_INT, None)
+        glDrawElements(
+            GL_TRIANGLES, i.index_count, GL_UNSIGNED_INT, ctypes.c_void_p(i.byte_offset)
+        )
 
 
 def init_pg(display):
@@ -203,6 +249,7 @@ def main():
 
     init_pg(display)
 
+    # Define things for shaders
     lighting_shader = Shader("vertex_shader.vert", "fragment_shader.frag")
     lighting_shader.use()
     lighting_shader.setVec3("objectColor", 1.0, 0.5, 0.31)
@@ -213,21 +260,15 @@ def main():
     )
 
     # Define geometry now
-    cubePositions = (
-        glm.vec3(2.0, 5.0, -15.0),
-        glm.vec3(-1.5, -2.2, -2.5),
-        glm.vec3(-3.8, -2.0, -12.3),
-        glm.vec3(2.4, -0.4, -3.5),
-        glm.vec3(-1.7, 3.0, -7.5),
-        glm.vec3(1.3, -2.0, -2.5),
-        glm.vec3(1.5, 2.0, -2.5),
-        glm.vec3(1.5, 0.2, -1.5),
-        glm.vec3(-1.3, 1.0, -1.5),
-    )
-    light_object_pos = glm.vec3(5, 3.0, 0)
+    light_object_pos = glm.vec3(1, 1, 1)
 
-    my_objects_list = [Object(c, lighting_shader) for c in cubePositions]
-    my_lighting_object_list = [Object(light_object_pos, light_object_shader)]
+    my_objects_list = [
+        Object(glm.vec3(2.0, -0.5, 0.0), "torus.obj", lighting_shader),
+        Object(glm.vec3(-2.0, -0.5, 0.0), "torus.obj", lighting_shader),
+    ]
+    my_lighting_object_list = [
+        Object(light_object_pos, "sphere.obj", light_object_shader)
+    ]
 
     my_level = Level(my_objects_list, my_lighting_object_list)
 
@@ -235,7 +276,7 @@ def main():
     glEnable(GL_DEPTH_TEST)
     glDepthFunc(GL_LESS)
     # Also do not render backfaces to save render time
-    # glEnable(GL_CULL_FACE)
+    glEnable(GL_CULL_FACE)
 
     clock = pg.time.Clock()
 
@@ -251,7 +292,6 @@ def main():
         world_up=glm.vec3(0, 1, 0),
     )
 
-    # We will need to keep track of ticks
     current_ticks = 0
     last_ticks = 0
     while True:
@@ -287,23 +327,24 @@ def main():
         glClearColor(0.0, 0.0, 0.0, 1.0)
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
+        # compute/update values for animated objects
         rad = pg.time.get_ticks() / 1000
-        light_object_pos = glm.vec3(5 * glm.cos(rad), 3.0, 5 * glm.sin(rad))
-
+        light_object_pos = glm.vec3(1 * glm.cos(rad), 1.0, 1 * glm.sin(rad))
         my_level.light_object_list[0].pos = light_object_pos
-
         lighting_shader.use()
         lighting_shader.setVec3(
             "lightPos", light_object_pos.x, light_object_pos.y, light_object_pos.z
         )
 
-        # We could've defined this outside the game loop since it stays static
+        # Now get projection & view matrices
+        # We could've defined projection outside the game loop since it stays static
         projection = glm.perspective(
             glm.radians(settings["FOV"]), (display[0] / display[1]), 0.1, 100.0
         )
 
         view = camera.get_view_matrix()
 
+        # Draw objects within level: geometries and lighting objects
         draw_objects(
             my_level.vao, my_level.object_list, lighting_shader, projection, view
         )
@@ -322,7 +363,7 @@ def main():
         clock.tick(settings["FPS"])
 
         # Actual FPS
-    # print(clock.get_fps())
+        # print(clock.get_fps())
 
 
 if __name__ == "__main__":
