@@ -1,0 +1,22 @@
+[project]
+name = "3d-python-render"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "black==26.1.0",
+    "click==8.3.1",
+    "colorama==0.4.6",
+    "configparser==7.2.0",
+    "mypy-extensions==1.1.0",
+    "numpy==2.4.2",
+    "packaging==26.0",
+    "pathlib==1.0.1",
+    "pathspec==1.0.4",
+    "platformdirs==4.9.2",
+    "pygame>=2.6.1",
+    "pyglm==2.8.3",
+    "pyopengl==3.1.10",
+    "pytokens==0.4.1",
+]
