@@ -263,7 +263,7 @@ def main():
     light_object_pos = glm.vec3(1, 1, 1)
 
     my_objects_list = [
-        Object(glm.vec3(2.0, -0.5, 0.0), "torus.obj", lighting_shader),
+        Object(glm.vec3(2.0, -0.5, 0.0), "rectangle_5_by_8.obj", lighting_shader),
         Object(glm.vec3(-2.0, -0.5, 0.0), "torus.obj", lighting_shader),
     ]
     my_lighting_object_list = [
