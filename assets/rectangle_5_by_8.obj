@@ -49,28 +49,30 @@ vn 0 0 1
 vn 0 0 1
 vn 0 0 1
 # tcoords array 0
-vt 0 0.5
-vt 1 0.5
-vt 0 8.5
-vt 1 8.5
-vt -0 0.5
-vt -0 8.5
-vt -0.5 -0
-vt -0.5 -1
-vt -5.5 -0
-vt -5.5 -1
-vt 0.5 -0
-vt 0.5 -1
-vt 5.5 -0
-vt 5.5 -1
-vt -0.5 0.5
-vt -5.5 0.5
-vt -0.5 8.5
-vt -5.5 8.5
-vt 0.5 0.5
-vt 5.5 0.5
-vt 0.5 8.5
-vt 5.5 8.5
+vt 0 0
+vt 1 0
+vt 0 1
+vt 1 1
+vt 0 0
+vt 1 0
+vt 0 1
+vt 1 1
+vt 0 0
+vt 1 0
+vt 0 1
+vt 1 1
+vt 0 0
+vt 1 0
+vt 0 1
+vt 1 1
+vt 0 0
+vt 1 0
+vt 0 1
+vt 1 1
+vt 0 0
+vt 1 0
+vt 0 1
+vt 1 1
 usemtl rectangle_5_by_8
 f 1/1/1 2/2/2 3/3/3
 f 2/2/2 4/4/4 3/3/3

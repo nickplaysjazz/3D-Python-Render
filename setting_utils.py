@@ -2,6 +2,7 @@ import configparser
 
 from pathlib import Path
 
+from constants import Filters
 from error_handling import raise_error
 
 
@@ -37,6 +38,14 @@ def read_settings(filename):
             "Options", "MOUSE_SENSITIVITY"
         )
         ret_dict["FPS"] = settings.getint("Options", "FPS")
+
+        # convert raw string to enum
+        raw_filter = settings.get("Options", "TEXTURE_FILTER").strip().lower()
+        ret_dict["TEXTURE_FILTER"] = Filters(raw_filter)
+
+        raw_filter = settings.get("Options", "MIPMAP_FILTER").strip().lower()
+        ret_dict["MIPMAP_FILTER"] = Filters(raw_filter)
+
     except ValueError as e:
         raise_error(Path(__file__).name, "Configuration file type mismatch error", e)
     except configparser.NoSectionError as e:

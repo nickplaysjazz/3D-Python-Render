@@ -21,25 +21,27 @@ class Shader:
         vertex_shader = glCreateShader(GL_VERTEX_SHADER)
         glShaderSource(vertex_shader, vertex_shader_file)
         glCompileShader(vertex_shader)
-        success = True
-        glGetShaderiv(vertex_shader, GL_COMPILE_STATUS, success)
+
+        success = glGetShaderiv(vertex_shader, GL_COMPILE_STATUS)
         if not success:
-            info_log = ""
-            glGetShaderInfoLog(vertex_shader, info_log)
+            info_log = glGetShaderInfoLog(vertex_shader)
             raise_error(
-                Path(__file__).name, "Vertex shader compilation failed", info_log
+                Path(__file__).name, 
+                "Vertex shader compilation failed", 
+                info_log.decode('utf-8')
             )
 
         fragment_shader = glCreateShader(GL_FRAGMENT_SHADER)
         glShaderSource(fragment_shader, fragment_shader_file)
         glCompileShader(fragment_shader)
-        success = True
-        glGetShaderiv(fragment_shader, GL_COMPILE_STATUS, success)
+
+        success = glGetShaderiv(fragment_shader, GL_COMPILE_STATUS)
         if not success:
-            info_log = ""
-            glGetShaderInfoLog(fragment_shader, info_log)
+            info_log = glGetShaderInfoLog(fragment_shader)
             raise_error(
-                Path(__file__).name, "Fragment shader compilation failed", info_log
+                Path(__file__).name, 
+                "Fragment shader compilation failed", 
+                info_log.decode('utf-8')
             )
 
         # 3. Link shader program
@@ -48,10 +50,14 @@ class Shader:
         glAttachShader(self.ID, fragment_shader)
         glLinkProgram(self.ID)
 
-        glGetProgramiv(self.ID, GL_LINK_STATUS, success)
+        success = glGetProgramiv(self.ID, GL_LINK_STATUS)
         if not success:
-            glGetProgramInfoLog(self.ID, info_log)
-            raise_error(Path(__file__).name, "Shader program linking failed", info_log)
+            info_log = glGetProgramInfoLog(self.ID)
+            raise_error(
+                Path(__file__).name, 
+                "Shader program linking failed", 
+                info_log.decode('utf-8')
+            )
 
         # 4. Delete unnecessary shaders
         glDeleteShader(vertex_shader)
