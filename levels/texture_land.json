@@ -1,0 +1,40 @@
+{
+    "level_name": "Texture Land",
+    "skybox": "textures/skybox",
+    "lighting_objects": [
+        {
+            "filename": "sphere.obj",
+            "position": [0.0, 10.0, 0.0],
+            "rotation": [0.0, 0.0, 0.0]
+        }
+    ],
+    "scene_objects": [
+        {
+            "filename": "rectangle_5_by_8.obj",
+            "position": [-5, 0.0, -5],
+            "rotation": [0.0, 45, 0.0],
+            "texture_filename": "textures/201.jpg"
+        },
+        {
+            "filename": "rectangle_5_by_8.obj",
+            "position": [-5, 0.0, 5],
+            "rotation": [0.0, 0.0, 0.0],
+            "texture_filename": "textures/202.jpg"
+        },
+        {
+            "filename": "torus.obj",
+            "position": [5.0, 3.0, 5.0],
+            "rotation": [0.0, 0.0, 0.0]
+        },
+        {
+            "filename": "sphere.obj",
+            "position": [4.0, 3.0, -4.0],
+            "rotation": [0.0, 0.0, 0.0]
+        },
+        {
+            "filename": "cylinder.obj",
+            "position": [12.0, 3.0, -6.0],
+            "rotation": [0.0, 0.0, 0.0]
+        }
+    ]
+}
