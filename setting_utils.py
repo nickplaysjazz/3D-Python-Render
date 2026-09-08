@@ -40,6 +40,7 @@ def read_settings(filename):
         ret_dict["FPS"] = settings.getint("Options", "FPS")
 
         # convert raw string to enum
+        # FIXME filters are not used correctly
         raw_filter = settings.get("Options", "TEXTURE_FILTER").strip().lower()
         ret_dict["TEXTURE_FILTER"] = Filters(raw_filter)
 

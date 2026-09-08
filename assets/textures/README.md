@@ -101,3 +101,38 @@
 - 249_norm.jpg
 - 250.jpg
 - 250_norm.jpg
+
+"Planet Surface Skyboxes" by Screaming Brain Studios licensed under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/): [https://opengameart.org/content/planet-surface-skyboxes](https://opengameart.org/content/planet-surface-skyboxes) 
+
+- Cubemap_Cratered_01-512x512.png
+- Cubemap_Cratered_02-512x512.png
+- Cubemap_Desert_01-512x512.png
+- Cubemap_Desert_02-512x512.png
+- Cubemap_Hazy_01-512x512.png
+- Cubemap_Hazy_02-512x512.png
+- Cubemap_Icy_01-512x512.png
+- Cubemap_Icy_02-512x512.png
+- Cubemap_Island_01-512x512.png
+- Cubemap_Island_02-512x512.png
+- Cubemap_Lava_01-512x512.png
+- Cubemap_Lava_02-512x512.png
+- Cubemap_Lush_01-512x512.png
+- Cubemap_Lush_02-512x512.png
+- Cubemap_Mars_01-512x512.png
+- Cubemap_Mars_02-512x512.png
+- Cubemap_Methane_01-512x512.png
+- Cubemap_Methane_02-512x512.png
+- Cubemap_Ocean_01-512x512.png
+- Cubemap_Ocean_02-512x512.png
+- Cubemap_Plains_01-512x512.png
+- Cubemap_Plains_02-512x512.png
+- Cubemap_Red_01-512x512.png
+- Cubemap_Red_02-512x512.png
+- Cubemap_Rocky_01-512x512.png
+- Cubemap_Rocky_02-512x512.png
+- Cubemap_Snowy_01-512x512.png
+- Cubemap_Snowy_02-512x512.png
+- Cubemap_Temperate_01-512x512.png
+- Cubemap_Temperate_02-512x512.png
+- Cubemap_Tropical_01-512x512.png
+- Cubemap_Tropical_02-512x512.png

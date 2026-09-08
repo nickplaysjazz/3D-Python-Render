@@ -28,6 +28,8 @@ This project was made possible through the tutorials at [Learn OpenGL](https://l
 
 This project uses assets from "50 free textures 5 - with normalmaps" by rubberduck licensed under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/): [https://opengameart.org/content/50-free-textures-5-with-normalmaps](https://opengameart.org/content/50-free-textures-5-with-normalmaps). See `assets/textures/README.md` for more details. 
 
+This project uses assets from "Planet Surface Skyboxes" by Screaming Brain Studios licensed under [CC0 1.0 Universal](https://creativecommons.org/publicdomain/zero/1.0/): [https://opengameart.org/content/planet-surface-skyboxes](https://opengameart.org/content/planet-surface-skyboxes). See `assets/textures/README.md` for more details. 
+
 
 ## Contributing
 This project is a work-in-progress. Contributions, including bug reports or suggested improvements, will not be accepted at this time. Thank you for your interest in this project.

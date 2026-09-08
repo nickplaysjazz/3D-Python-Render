@@ -319,6 +319,88 @@ def draw_objects(current_vao, objects, current_shader, projection, view):
             GL_TRIANGLES, i.index_count, GL_UNSIGNED_INT, ctypes.c_void_p(i.byte_offset)
         )
 
+def draw_skybox(skybox_vao, skybox_shader, cubemap_texture, projection, view):
+    glBindVertexArray(skybox_vao)
+
+    # Skybox must always be behind
+    glDepthFunc(GL_LEQUAL)
+
+    skybox_shader.use()
+
+    view_no_translation = glm.mat4(glm.mat3(view))
+
+    skybox_shader.setMat4("projection", glm.value_ptr(projection))
+    skybox_shader.setMat4("view", glm.value_ptr(view_no_translation))
+
+    glBindVertexArray(skybox_vao)
+    glActiveTexture(GL_TEXTURE0)
+    glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture)
+    skybox_shader.setInt("skybox", 0)
+
+    glDrawArrays(GL_TRIANGLES, 0, 36)
+
+    # Reset depth function 
+    glBindVertexArray(0)
+    glDepthFunc(GL_LESS)
+
+def create_skybox_vao():
+    skybox_vertices = [
+        -1.0,  1.0, -1.0,
+        -1.0, -1.0, -1.0,
+         1.0, -1.0, -1.0,
+         1.0, -1.0, -1.0,
+         1.0,  1.0, -1.0,
+        -1.0,  1.0, -1.0,
+
+        -1.0, -1.0,  1.0,
+        -1.0, -1.0, -1.0,
+        -1.0,  1.0, -1.0,
+        -1.0,  1.0, -1.0,
+        -1.0,  1.0,  1.0,
+        -1.0, -1.0,  1.0,
+
+         1.0, -1.0, -1.0,
+         1.0, -1.0,  1.0,
+         1.0,  1.0,  1.0,
+         1.0,  1.0,  1.0,
+         1.0,  1.0, -1.0,
+         1.0, -1.0, -1.0,
+
+        -1.0, -1.0,  1.0,
+        -1.0,  1.0,  1.0,
+         1.0,  1.0,  1.0,
+         1.0,  1.0,  1.0,
+         1.0, -1.0,  1.0,
+        -1.0, -1.0,  1.0,
+
+        -1.0,  1.0, -1.0,
+         1.0,  1.0, -1.0,
+         1.0,  1.0,  1.0,
+         1.0,  1.0,  1.0,
+        -1.0,  1.0,  1.0,
+        -1.0,  1.0, -1.0,
+
+        -1.0, -1.0, -1.0,
+        -1.0, -1.0,  1.0,
+         1.0, -1.0, -1.0,
+         1.0, -1.0, -1.0,
+        -1.0, -1.0,  1.0,
+         1.0, -1.0,  1.0
+    ]
+    skybox_data = glm.array(glm.float32, *skybox_vertices)
+    
+    skybox_vao = glGenVertexArrays(1)
+    skybox_vbo = glGenBuffers(1)
+    
+    glBindVertexArray(skybox_vao)
+    glBindBuffer(GL_ARRAY_BUFFER, skybox_vbo)
+    glBufferData(GL_ARRAY_BUFFER, skybox_data.nbytes, skybox_data.ptr, GL_STATIC_DRAW)
+    
+    glEnableVertexAttribArray(0)
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 3 * glm.sizeof(glm.float32), None)
+    
+    glBindVertexArray(0)
+    return skybox_vao
 
 def init_pg(display):
     # Pygame initialization
@@ -372,10 +454,44 @@ def load_level_from_json(filepath, main_shader, light_shader):
             light_objects.append(
                 Object(pos, filename, light_shader, rotation=rot, texture_filename=tex_filename)
             )
+
+        # skybox
+        skybox_dir = level_data.get("skybox")
+        if skybox_dir:
+            face_filenames = ["right.png", "left.png", "top.png", "bottom.png", "front.png", "back.png"]
+
+            cubemap_texture = glGenTextures(1)
+            glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture)
+
+            ASSET_DIR = Path(__file__).resolve().parent / "assets"
+            for i, filename in enumerate(face_filenames):
+                face_path = ASSET_DIR / skybox_dir / filename
+                
+                surface = pg.image.load(face_path)
+                image_data = pg.image.tostring(surface, "RGB", False)
+                width = surface.get_width()
+                height = surface.get_height()
+
+                # Upload face pixel data to corresponding OpenGL Cubemap target
+                target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + i
+                glTexImage2D(
+                    target, 0, GL_RGB, width, height, 0,
+                    GL_RGB, GL_UNSIGNED_BYTE, image_data
+                )
+
+            # Set cubemap filtering and wrapping rules
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MIN_FILTER, GL_LINEAR)
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE)
+            glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE)
+
+            glBindTexture(GL_TEXTURE_CUBE_MAP, 0)
+        
     except Exception as e:
             raise_error(Path(__file__).name, "Level loading failed", e)
 
-    return scene_objects, light_objects
+    return scene_objects, light_objects, cubemap_texture
 
 
 def main():
@@ -396,14 +512,18 @@ def main():
         "vertex_shader.vert", "light_object_fragment_shader.frag"
     )
 
+    skybox_shader = Shader("skybox.vert", "skybox.frag")
+
     # load geometry from level json file
-    my_objects_list, my_lighting_object_list = load_level_from_json(
+    my_objects_list, my_lighting_object_list, skybox_texture = load_level_from_json(
         "levels/texture_land.json", 
         lighting_shader, 
         light_object_shader
     )
 
     my_level = Level(my_objects_list, my_lighting_object_list)
+
+    skybox_vao = create_skybox_vao()
 
     # Enable depth testing for drawing objects in correct order
     glEnable(GL_DEPTH_TEST)
@@ -461,13 +581,13 @@ def main():
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT)
 
         # compute/update values for animated objects
-        # rad = pg.time.get_ticks() / 1000
-        # light_object_pos = glm.vec3(1 * glm.cos(rad), 1.0, 1 * glm.sin(rad))
-        # my_level.light_object_list[0].pos = light_object_pos
-        # lighting_shader.use()
-        # lighting_shader.setVec3(
-            # "lightPos", light_object_pos.x, light_object_pos.y, light_object_pos.z
-        # )
+        rad = pg.time.get_ticks() / 1000
+        light_object_pos = glm.vec3(3 * glm.cos(rad), 10.0, 3 * glm.sin(rad))
+        my_level.light_object_list[0].pos = light_object_pos
+        lighting_shader.use()
+        lighting_shader.setVec3(
+            "lightPos", light_object_pos.x, light_object_pos.y, light_object_pos.z
+        )
 
         # Now get projection & view matrices
         # We could've defined projection outside the game loop since it stays static
@@ -488,6 +608,16 @@ def main():
             projection,
             view,
         )
+
+        # Render skybox last
+        if skybox_texture:
+            draw_skybox(
+                skybox_vao,
+                skybox_shader,
+                skybox_texture,
+                projection,
+                view
+            )
 
         # display to user
         pg.display.flip()
