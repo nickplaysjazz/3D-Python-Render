@@ -26,9 +26,9 @@ class Shader:
         if not success:
             info_log = glGetShaderInfoLog(vertex_shader)
             raise_error(
-                Path(__file__).name, 
-                "Vertex shader compilation failed", 
-                info_log.decode('utf-8')
+                Path(__file__).name,
+                "Vertex shader compilation failed",
+                info_log.decode("utf-8"),
             )
 
         fragment_shader = glCreateShader(GL_FRAGMENT_SHADER)
@@ -39,9 +39,9 @@ class Shader:
         if not success:
             info_log = glGetShaderInfoLog(fragment_shader)
             raise_error(
-                Path(__file__).name, 
-                "Fragment shader compilation failed", 
-                info_log.decode('utf-8')
+                Path(__file__).name,
+                "Fragment shader compilation failed",
+                info_log.decode("utf-8"),
             )
 
         # 3. Link shader program
@@ -54,9 +54,9 @@ class Shader:
         if not success:
             info_log = glGetProgramInfoLog(self.ID)
             raise_error(
-                Path(__file__).name, 
-                "Shader program linking failed", 
-                info_log.decode('utf-8')
+                Path(__file__).name,
+                "Shader program linking failed",
+                info_log.decode("utf-8"),
             )
 
         # 4. Delete unnecessary shaders

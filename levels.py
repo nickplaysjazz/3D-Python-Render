@@ -1,8 +1,52 @@
 import ctypes
+import json
 import glm
+from pathlib import Path
 
 from OpenGL.GL import *
 from OpenGL.GLU import *
+from collision import CollisionObject
+
+
+def _obj_local_aabb(filename):
+    asset_path = Path(__file__).resolve().parent / "assets" / filename
+    vertices = []
+    with open(asset_path, "r", encoding="utf-8") as obj_file:
+        for line in obj_file:
+            if line.startswith("v "):
+                vertices.append(tuple(float(value) for value in line.split()[1:4]))
+    if not vertices:
+        raise ValueError(f"OBJ file has no vertices: {asset_path}")
+    return {
+        "min": glm.vec3(
+            *(min(vertex[index] for vertex in vertices) for index in range(3))
+        ),
+        "max": glm.vec3(
+            *(max(vertex[index] for vertex in vertices) for index in range(3))
+        ),
+    }
+
+
+def load_collision_objects(filepath):
+    """Load collision geometry.
+     
+    Does not require an OpenGL context... important for Network!"""
+    
+    with open(filepath, "r", encoding="utf-8") as level_file:
+        level_data = json.load(level_file)
+
+    collision_objects = []
+    for object_data in level_data.get("scene_objects", []):
+        if object_data.get("collision", False):
+            collision_objects.append(
+                CollisionObject(
+                    pos=glm.vec3(*object_data["position"]),
+                    rotation=glm.vec3(*object_data.get("rotation", [0.0, 0.0, 0.0])),
+                    local_aabb=_obj_local_aabb(object_data["filename"]),
+                )
+            )
+    return collision_objects
+
 
 class Level:
     def __init__(self, object_list, light_object_list):
@@ -26,7 +70,7 @@ class Level:
         for obj in all_objs:
             # Store the byte offset for glDrawElements
             # (Index count so far * 4 bytes per 32-bit uint)
-            obj.byte_offset = current_i_offset * 4 
+            obj.byte_offset = current_i_offset * 4
 
             # offset the indices themselves so they point to the correct vertices in the combined VBO
             offset_indices = [i + current_v_offset for i in obj.indices]
@@ -74,7 +118,7 @@ class Level:
             ctypes.c_void_p(3 * glm.sizeof(glm.float32)),
         )
         glEnableVertexAttribArray(1)
-        
+
         # texture coords attribute (u, v)
         glVertexAttribPointer(
             2,

@@ -16,7 +16,7 @@ class Object:
         filename=None,
         lighting_shader=None,
         rotation=None,
-        texture_filename=None
+        texture_filename=None,
     ):
         self.pos = pos
         self.rotation = rotation if rotation is not None else glm.vec3(0.0, 0.0, 0.0)
@@ -130,7 +130,7 @@ class Object:
         try:
             # Load image and convert to alpha for consistent RGBA format
             image = pg.image.load(str(texture_path)).convert_alpha()
-            
+
             if hasattr(pg.image, "tobytes"):
                 image_data = pg.image.tobytes(image, "RGBA", True)
             else:
@@ -143,11 +143,23 @@ class Object:
             # Set texture wrapping and filtering options
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT)
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT)
-            glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR)
+            glTexParameteri(
+                GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR
+            )
             glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR)
 
             # Generate texture and mipmaps
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, image_data)
+            glTexImage2D(
+                GL_TEXTURE_2D,
+                0,
+                GL_RGBA,
+                width,
+                height,
+                0,
+                GL_RGBA,
+                GL_UNSIGNED_BYTE,
+                image_data,
+            )
             glGenerateMipmap(GL_TEXTURE_2D)
 
             return texture_id
@@ -160,20 +172,57 @@ class Object:
         """
         Computes the static local min/max bounds directly from the un-transformed vertices.
         """
-        min_x = min_y = min_z = float('inf')
-        max_x = max_y = max_z = float('-inf')
+        min_x = min_y = min_z = float("inf")
+        max_x = max_y = max_z = float("-inf")
 
-        for i in range(0, len(local_vertices), 8): 
-            vx, vy, vz = local_vertices[i], local_vertices[i+1], local_vertices[i+2]
+        for i in range(0, len(local_vertices), 8):
+            vx, vy, vz = local_vertices[i], local_vertices[i + 1], local_vertices[i + 2]
 
-            if vx < min_x: min_x = vx
-            if vx > max_x: max_x = vx
-            if vy < min_y: min_y = vy
-            if vy > max_y: max_y = vy
-            if vz < min_z: min_z = vz
-            if vz > max_z: max_z = vz
+            if vx < min_x:
+                min_x = vx
+            if vx > max_x:
+                max_x = vx
+            if vy < min_y:
+                min_y = vy
+            if vy > max_y:
+                max_y = vy
+            if vz < min_z:
+                min_z = vz
+            if vz > max_z:
+                max_z = vz
 
         return {
             "min": glm.vec3(min_x, min_y, min_z),
-            "max": glm.vec3(max_x, max_y, max_z)
+            "max": glm.vec3(max_x, max_y, max_z),
         }
+
+
+class NetworkPlayer(Object):
+    """Renderable remote player whose transform is driven by network snapshots."""
+
+    def __init__(self, pos, lighting_shader=None, filename="sphere.obj"):
+        super().__init__(pos, filename, lighting_shader)
+        self.player_id = None
+        self.active = False
+        self.target_pos = glm.vec3(pos)
+        self.target_rotation = glm.vec3(0.0)
+
+    def assign(self, player_id, pos, rotation):
+        self.player_id = player_id
+        self.active = True
+        self.pos = glm.vec3(pos)
+        self.target_pos = glm.vec3(pos)
+        self.rotation = glm.vec3(rotation)
+        self.target_rotation = glm.vec3(rotation)
+
+    def release(self):
+        self.active = False
+        self.player_id = None
+        self.pos = glm.vec3(0.0, -1000.0, 0.0)
+        self.target_pos = glm.vec3(self.pos)
+
+    def update_interpolation(self, factor):
+        self.pos = glm.mix(self.pos, self.target_pos, min(1.0, max(0.0, factor)))
+        self.rotation = glm.mix(
+            self.rotation, self.target_rotation, min(1.0, max(0.0, factor))
+        )
