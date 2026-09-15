@@ -22,6 +22,8 @@ If you are using the `conda` or `mamba` python package manager:
 ## Usage
 TODO: Settings, files, etc. 
 
+Multiplayer: server-side run `python server.py --host 0.0.0.0 --port 9999` for UDP port 9999. Connect on clients via `NETWORK_ENABLED=true` and changing `NETWORK_HOST` and `NETWORK_PORT` in `settings.ini`. Server owners can edit server settings in the head of `server.py`.
+
 
 ## Acknowledgments
 This project was made possible through the tutorials at [Learn OpenGL](https://learnopengl.com/) by [Joey de Vries](https://x.com/JoeyDeVriez), code adapted and licensed under [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/). 
@@ -57,4 +59,4 @@ You can reach me through the contact information listed on the [About page at my
 - Add colors to objects
 - Textures
 - Specular lighting?
-- Textures/materials
+- Textures/material lighting? 

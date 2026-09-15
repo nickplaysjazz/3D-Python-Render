@@ -1,0 +1,33 @@
+{
+    "level_name": "Texture Land",
+    "skybox": "textures/skybox",
+    "lighting_objects": [
+        {
+            "filename": "sphere.obj",
+            "position": [0.0, 10.0, 0.0],
+            "rotation": [0.0, 0.0, 0.0]
+        }
+    ],
+    "scene_objects": [
+        {
+            "filename": "x3d-cm-interior-graffiti-uvs.obj",
+            "position": [0.0, -100, 0.0],
+            "rotation": [0.0, 0.0, 0.0]
+        },
+        {
+            "filename": "x3d-cm-interior-hull-uvs.obj",
+            "position": [0.0, -100, 0.0],
+            "rotation": [0.0, 0.0, 0.0]
+        },
+        {
+            "filename": "x3d-cm-interior-panel-uvs.obj",
+            "position": [0.0, -100, 0.0],
+            "rotation": [0.0, 0.0, 0.0]
+        },
+        {
+            "filename": "x3d-cm-interior-seats-uvs.obj",
+            "position": [0.0, -100, 0.0],
+            "rotation": [0.0, 0.0, 0.0]
+        }
+    ]
+}

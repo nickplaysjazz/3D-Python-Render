@@ -1,6 +1,12 @@
 import ctypes
 import glm
 import json
+import os
+
+# prevents pygame message on running project
+# must add before pygame module
+os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "hide"
+
 import pygame as pg
 import sys
 
@@ -15,7 +21,8 @@ from constants import Directions
 from debug import create_aabb_vao, render_debug_aabbs
 from error_handling import raise_error
 from levels import Level
-from objects import Object
+from network import NetworkManager
+from objects import NetworkPlayer, Object
 from setting_utils import read_settings
 from skybox import create_skybox_vao, draw_skybox
 from shader_utils import Shader
@@ -29,16 +36,24 @@ def draw_objects(current_vao, objects, current_shader, projection, view):
     current_shader.use()
     current_shader.setMat4("projection", glm.value_ptr(projection))
     current_shader.setMat4("view", glm.value_ptr(view))
-    
+
     for i in objects:
+        if not getattr(i, "active", True):
+            continue
         model = glm.mat4(1.0)
         model = glm.translate(model, i.pos)
         if i.rotation.y != 0.0:
-            model = glm.rotate(model, glm.radians(i.rotation.y), glm.vec3(0.0, 1.0, 0.0))
+            model = glm.rotate(
+                model, glm.radians(i.rotation.y), glm.vec3(0.0, 1.0, 0.0)
+            )
         if i.rotation.x != 0.0:
-            model = glm.rotate(model, glm.radians(i.rotation.x), glm.vec3(1.0, 0.0, 0.0))
+            model = glm.rotate(
+                model, glm.radians(i.rotation.x), glm.vec3(1.0, 0.0, 0.0)
+            )
         if i.rotation.z != 0.0:
-            model = glm.rotate(model, glm.radians(i.rotation.z), glm.vec3(0.0, 0.0, 1.0))
+            model = glm.rotate(
+                model, glm.radians(i.rotation.z), glm.vec3(0.0, 0.0, 1.0)
+            )
         current_shader.setMat4("model", glm.value_ptr(model))
 
         # bind texture if present
@@ -54,6 +69,7 @@ def draw_objects(current_vao, objects, current_shader, projection, view):
         glDrawElements(
             GL_TRIANGLES, i.index_count, GL_UNSIGNED_INT, ctypes.c_void_p(i.byte_offset)
         )
+
 
 def init_pg(display):
     # Pygame initialization
@@ -77,32 +93,35 @@ def init_pg(display):
     pg.mouse.set_visible(False)
     pg.event.set_grab(True)  # Lock mouse to window
 
+
 def load_level_from_json(filepath, main_shader, light_shader):
     cubemap_texture = 0
     scene_objects = []
     light_objects = []
 
-    try: 
-        with open(filepath, 'r') as f:
+    try:
+        with open(filepath, "r") as f:
             level_data = json.load(f)
 
-        # scene objects 
+        # scene objects
         for obj_data in level_data.get("scene_objects", []):
             pos = glm.vec3(*obj_data["position"])
             rot = glm.vec3(*obj_data.get("rotation", [0.0, 0.0, 0.0]))
             filename = obj_data["filename"]
             tex_filename = obj_data.get("texture_filename")
-            
+
             # 1. Instantiate the object
-            new_obj = Object(pos, filename, main_shader, rotation=rot, texture_filename=tex_filename)
-            
+            new_obj = Object(
+                pos, filename, main_shader, rotation=rot, texture_filename=tex_filename
+            )
+
             # 2. Extract collision data from JSON and set it
             new_obj.collision = obj_data.get("collision", False)
-            
+
             # 3. If collision is enabled, compute and store the AABB
             if new_obj.collision:
                 new_obj.local_aabb = Object.compute_local_aabb(new_obj.vertices)
-                
+
             scene_objects.append(new_obj)
 
         # lighting objects
@@ -111,15 +130,28 @@ def load_level_from_json(filepath, main_shader, light_shader):
             rot = glm.vec3(*obj_data.get("rotation", [0.0, 0.0, 0.0]))
             filename = obj_data["filename"]
             tex_filename = obj_data.get("texture_filename")
-            
+
             light_objects.append(
-                Object(pos, filename, light_shader, rotation=rot, texture_filename=tex_filename)
+                Object(
+                    pos,
+                    filename,
+                    light_shader,
+                    rotation=rot,
+                    texture_filename=tex_filename,
+                )
             )
 
         # skybox
         skybox_dir = level_data.get("skybox")
         if skybox_dir:
-            face_filenames = ["right.png", "left.png", "top.png", "bottom.png", "front.png", "back.png"]
+            face_filenames = [
+                "right.png",
+                "left.png",
+                "top.png",
+                "bottom.png",
+                "front.png",
+                "back.png",
+            ]
 
             cubemap_texture = glGenTextures(1)
             glBindTexture(GL_TEXTURE_CUBE_MAP, cubemap_texture)
@@ -127,7 +159,7 @@ def load_level_from_json(filepath, main_shader, light_shader):
             ASSET_DIR = Path(__file__).resolve().parent / "assets"
             for i, filename in enumerate(face_filenames):
                 face_path = ASSET_DIR / skybox_dir / filename
-                
+
                 surface = pg.image.load(face_path)
                 image_data = pg.image.tostring(surface, "RGB", False)
                 width = surface.get_width()
@@ -136,8 +168,15 @@ def load_level_from_json(filepath, main_shader, light_shader):
                 # Upload face pixel data to corresponding OpenGL Cubemap target
                 target = GL_TEXTURE_CUBE_MAP_POSITIVE_X + i
                 glTexImage2D(
-                    target, 0, GL_RGB, width, height, 0,
-                    GL_RGB, GL_UNSIGNED_BYTE, image_data
+                    target,
+                    0,
+                    GL_RGB,
+                    width,
+                    height,
+                    0,
+                    GL_RGB,
+                    GL_UNSIGNED_BYTE,
+                    image_data,
                 )
 
             # Set cubemap filtering and wrapping rules
@@ -148,9 +187,9 @@ def load_level_from_json(filepath, main_shader, light_shader):
             glTexParameteri(GL_TEXTURE_CUBE_MAP, GL_TEXTURE_WRAP_R, GL_CLAMP_TO_EDGE)
 
             glBindTexture(GL_TEXTURE_CUBE_MAP, 0)
-        
+
     except Exception as e:
-            raise_error(Path(__file__).name, "Level loading failed", e)
+        raise_error(Path(__file__).name, "Level loading failed", e)
 
     return scene_objects, light_objects, cubemap_texture
 
@@ -177,12 +216,17 @@ def main():
 
     # load geometry from level json file
     my_objects_list, my_lighting_object_list, skybox_texture = load_level_from_json(
-        "levels/texture_land.json", 
-        lighting_shader, 
-        light_object_shader
+        "levels/texture_land.json", lighting_shader, light_object_shader
     )
 
-    my_level = Level(my_objects_list, my_lighting_object_list)
+    network = None
+    if settings["NETWORK_ENABLED"]:
+        network = NetworkManager(settings["NETWORK_HOST"], settings["NETWORK_PORT"])
+        network.start()
+    remote_players = [
+        NetworkPlayer(glm.vec3(0.0, -1000.0, 0.0), lighting_shader) for _ in range(16)
+    ]
+    my_level = Level(my_objects_list + remote_players, my_lighting_object_list)
     skybox_vao = create_skybox_vao()
     aabb_vao = create_aabb_vao()
 
@@ -210,7 +254,8 @@ def main():
     last_ticks = 0
 
     show_collision_boxes = False
-    
+    remote_by_id = {}
+
     while True:
         # Count frames rendered
         current_ticks = pg.time.get_ticks()
@@ -220,13 +265,18 @@ def main():
         # handle events
         for event in pg.event.get():
             if event.type == pg.QUIT:
+                if network is not None:
+                    network.close()
                 pg.quit()
                 sys.exit()
             if event.type == pg.KEYDOWN:
                 if event.key == pg.K_ESCAPE:
+                    if network is not None:
+                        network.close()
                     pg.quit()
                     sys.exit()
-                # Toggled in keydown loop to prevent strobing true/false
+                # check from backquote here
+                # if we check here it prevents holding down = strobe effect
                 if event.key == pg.K_BACKQUOTE:
                     show_collision_boxes = not show_collision_boxes
 
@@ -246,6 +296,17 @@ def main():
             camera.process_keyboard(Directions.RIGHT, delta_ticks)
             moved = True
 
+        # send multiplayer info if necessary
+        if network is not None:
+            network.send_input(
+                bool(keys[pg.K_w]),
+                bool(keys[pg.K_s]),
+                bool(keys[pg.K_a]),
+                bool(keys[pg.K_d]),
+                camera.yaw,
+                camera.pitch,
+            )
+
         # check for collisions
         if moved:
             # Iteratively push the player out of any intersecting objects
@@ -258,6 +319,50 @@ def main():
 
         mouse_dx, mouse_dy = pg.mouse.get_rel()
         camera.process_mouse_movement(mouse_dx, -mouse_dy, constrain_pitch=True)
+
+        # if multiplayer, need to interpolate player motion to account for server's stored player position
+        if network is not None:
+            for packet in network.poll():
+                if packet.get("type") == "welcome":
+                    network.player_id = packet["player_id"]
+                    camera.pos = glm.vec3(*packet["position"])
+                elif packet.get("type") == "state":
+                    visible_ids = set()
+                    for player_data in packet["players"]:
+                        player_id = player_data["id"]
+                        visible_ids.add(player_id)
+                        if player_id == network.player_id:
+                            server_position = glm.vec3(*player_data["position"])
+                            if glm.distance(camera.pos, server_position) > 0.001:
+                                camera.pos = server_position
+                            continue
+                        player = remote_by_id.get(player_id)
+                        if player is None:
+                            player = next(
+                                (
+                                    candidate
+                                    for candidate in remote_players
+                                    if not candidate.active
+                                ),
+                                None,
+                            )
+                            if player is not None:
+                                remote_by_id[player_id] = player
+                                player.assign(
+                                    player_id,
+                                    player_data["position"],
+                                    player_data["rotation"],
+                                )
+                        if player is not None:
+                            player.target_pos = glm.vec3(*player_data["position"])
+                            player.target_rotation = glm.vec3(*player_data["rotation"])
+                    for player_id in list(remote_by_id):
+                        if player_id not in visible_ids:
+                            remote_by_id[player_id].release()
+                            del remote_by_id[player_id]
+
+        for player in remote_by_id.values():
+            player.update_interpolation(0.25)
 
         # clear previous screen
         glClearColor(0.0, 0.0, 0.0, 1.0)
@@ -291,30 +396,22 @@ def main():
         )
 
         # Draw AABB collision boxes if toggled
+        # light shader works here for a uniform color
         if show_collision_boxes:
             render_debug_aabbs(
-                aabb_vao, 
-                light_object_shader,  # Using the light shader as a basic fallback uniform color 
-                my_level.object_list, 
-                view, 
-                projection
+                aabb_vao, light_object_shader, my_level.object_list, view, projection
             )
 
         # Render skybox last
         if skybox_texture:
-            draw_skybox(
-                skybox_vao,
-                skybox_shader,
-                skybox_texture,
-                projection,
-                view
-            )
+            draw_skybox(skybox_vao, skybox_shader, skybox_texture, projection, view)
 
         # display to user
         pg.display.flip()
 
         # wait at 60 fps
         clock.tick(settings["FPS"])
+
 
 if __name__ == "__main__":
     main()

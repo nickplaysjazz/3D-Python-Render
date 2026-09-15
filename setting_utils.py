@@ -38,6 +38,15 @@ def read_settings(filename):
             "Options", "MOUSE_SENSITIVITY"
         )
         ret_dict["FPS"] = settings.getint("Options", "FPS")
+        ret_dict["NETWORK_ENABLED"] = settings.getboolean(
+            "Options", "NETWORK_ENABLED", fallback=False
+        )
+        ret_dict["NETWORK_HOST"] = settings.get(
+            "Options", "NETWORK_HOST", fallback="127.0.0.1"
+        )
+        ret_dict["NETWORK_PORT"] = settings.getint(
+            "Options", "NETWORK_PORT", fallback=9999
+        )
 
         # convert raw string to enum
         # FIXME filters are not used correctly
