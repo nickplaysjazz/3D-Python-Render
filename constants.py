@@ -13,7 +13,7 @@ class Filters(Enum):
     LINEAR = "linear"
 
 
-unit_box_vertices =     vertices = [
+unit_box_vertices = [
         0,
         0,
         0,
@@ -89,7 +89,7 @@ unit_box_vertices =     vertices = [
     ]
 
 
-skybox_vertices = skybox_vertices = [
+skybox_vertices = [
         -1.0,
         1.0,
         -1.0,

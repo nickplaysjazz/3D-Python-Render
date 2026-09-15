@@ -200,7 +200,7 @@ class Object:
 class NetworkPlayer(Object):
     """Renderable remote player whose transform is driven by network snapshots."""
 
-    def __init__(self, pos, lighting_shader=None, filename="sphere.obj"):
+    def __init__(self, pos, lighting_shader=None, filename="avatar.obj"):
         super().__init__(pos, filename, lighting_shader)
         self.player_id = None
         self.active = False
